@@ -7,6 +7,7 @@
     --text-primary: #1d1d1f;
     --text-secondary: #6e6e73;
     --text-muted: #aeaeb2;
+    --accent: #5b54d9;
     --border-color: rgba(0, 0, 0, 0.06);
     --border-hover: rgba(0, 0, 0, 0.12);
     --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
@@ -63,4 +64,78 @@ a { color: var(--text-primary); text-decoration: none; }
 /* 全局按钮非对称圆角定制 */
 .el-button {
     border-radius: 12px 4px 4px 4px !important;
+}
+
+:root[data-theme="dark"] {
+    --bg-primary: #171820;
+    --bg-card: #23252f;
+    --bg-input: #2d303b;
+    --text-primary: #f5f6fa;
+    --text-secondary: #c3c7d2;
+    --text-muted: #8d94a4;
+    --border-color: rgba(255, 255, 255, 0.12);
+    --border-hover: rgba(255, 255, 255, 0.22);
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.28);
+    --shadow-md: 0 2px 12px rgba(0,0,0,0.34);
+    --shadow-lg: 0 4px 24px rgba(0,0,0,0.42);
+    /* Element Plus teleport 组件（弹窗/下拉/浮层/输入框）深色变量映射 */
+    --el-bg-color: #23252f;
+    --el-bg-color-overlay: #2a2d38;
+    --el-fill-color-blank: #23252f;
+    --el-fill-color: #2d303b;
+    --el-fill-color-light: #2d303b;
+    --el-fill-color-lighter: #353947;
+    --el-text-color-primary: #f5f6fa;
+    --el-text-color-regular: #c3c7d2;
+    --el-text-color-secondary: #8d94a4;
+    --el-text-color-placeholder: #8d94a4;
+    --el-border-color: rgba(255, 255, 255, 0.12);
+    --el-border-color-light: rgba(255, 255, 255, 0.10);
+    --el-border-color-lighter: rgba(255, 255, 255, 0.08);
+    --el-border-color-extra-light: rgba(255, 255, 255, 0.06);
+    --el-input-bg-color: #2d303b;
+    --el-input-text-color: #f5f6fa;
+    --el-input-placeholder-color: #8d94a4;
+    --el-input-border-color: rgba(255, 255, 255, 0.12);
+    --el-input-hover-border-color: rgba(255, 255, 255, 0.22);
+    --el-disabled-bg-color: #262933;
+    --el-mask-color: rgba(0, 0, 0, 0.6);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+        --bg-primary: #171820;
+        --bg-card: #23252f;
+        --bg-input: #2d303b;
+        --text-primary: #f5f6fa;
+        --text-secondary: #c3c7d2;
+        --text-muted: #8d94a4;
+        --border-color: rgba(255, 255, 255, 0.12);
+        --border-hover: rgba(255, 255, 255, 0.22);
+        --shadow-sm: 0 1px 3px rgba(0,0,0,0.28);
+        --shadow-md: 0 2px 12px rgba(0,0,0,0.34);
+        --shadow-lg: 0 4px 24px rgba(0,0,0,0.42);
+        /* Element Plus teleport 组件深色变量映射 */
+        --el-bg-color: #23252f;
+        --el-bg-color-overlay: #2a2d38;
+        --el-fill-color-blank: #23252f;
+        --el-fill-color: #2d303b;
+        --el-fill-color-light: #2d303b;
+        --el-fill-color-lighter: #353947;
+        --el-text-color-primary: #f5f6fa;
+        --el-text-color-regular: #c3c7d2;
+        --el-text-color-secondary: #8d94a4;
+        --el-text-color-placeholder: #8d94a4;
+        --el-border-color: rgba(255, 255, 255, 0.12);
+        --el-border-color-light: rgba(255, 255, 255, 0.10);
+        --el-border-color-lighter: rgba(255, 255, 255, 0.08);
+        --el-border-color-extra-light: rgba(255, 255, 255, 0.06);
+        --el-input-bg-color: #2d303b;
+        --el-input-text-color: #f5f6fa;
+        --el-input-placeholder-color: #8d94a4;
+        --el-input-border-color: rgba(255, 255, 255, 0.12);
+        --el-input-hover-border-color: rgba(255, 255, 255, 0.22);
+        --el-disabled-bg-color: #262933;
+        --el-mask-color: rgba(0, 0, 0, 0.6);
+    }
 }

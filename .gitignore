@@ -34,3 +34,11 @@ coverage
 # VitePress cache
 docs/.vitepress/cache
 docs/.vitepress/theme/font
+
+# 临时产物与视觉验收材料（不提交 Git）
+.playwright-cli/
+.visual-review/
+
+# 临时验收打包产物（不提交 Git）
+*-review-package.zip
+final2-review-package.zip

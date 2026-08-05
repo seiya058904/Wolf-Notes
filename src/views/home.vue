@@ -4,25 +4,33 @@
       <img src="/logo.svg" alt="logo" class="logo">
       <h1 class="title">在线笔记</h1>
       <p class="subtitle">快速记录 · 智能标记 · 一键导出</p>
-      <div class="btn-group">
-        <button class="start-btn start-btn--wolf" @click="$emit('start', 'werewolf')">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><circle cx="9" cy="10" r="1"/><circle cx="15" cy="10" r="1"/></svg>
-          狼人杀
-        </button>
-        <button class="start-btn start-btn--spy" @click="$emit('start', 'spy')">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-          谁是卧底
-        </button>
+      <div class="game-section">
+        <span class="wolf-title">狼人杀</span>
+        <div class="wolf-actions">
+          <button v-if="hasSession" class="start-btn start-btn--primary" @click="$emit('continue')">继续上一局</button>
+          <button class="start-btn start-btn--outline" @click="$emit('new')">{{ hasSession ? '开始新对局' : '开始狼人杀对局' }}</button>
+        </div>
+      </div>
+      <div class="other-section">
+        <span class="other-title">其他模式</span>
+        <button class="start-btn start-btn--ghost" @click="$emit('start', 'spy')">谁是卧底</button>
       </div>
       <div class="links">
-        <a href="https://github.com/syhy0612/lrsNotes" target="_blank">GitHub</a>
+        <a href="https://github.com/seiya058904/Wolf-Notes" target="_blank">GitHub</a>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-defineEmits(['start'])
+import {onMounted, ref} from 'vue'
+import {hasSavedSession} from '@/lib/gameSession'
+
+defineEmits(['start', 'continue', 'new'])
+
+// 是否存在已保存的狼人杀对局：有则提供"继续上一局"入口
+const hasSession = ref(false)
+onMounted(() => { hasSession.value = hasSavedSession(window.localStorage) })
 </script>
 
 <style lang="scss" scoped>
@@ -66,11 +74,39 @@ defineEmits(['start'])
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
 }
 
-.btn-group {
+.game-section {
   display: flex;
-  gap: 14px;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
   margin-top: 32px;
+}
+
+.wolf-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.wolf-title {
+  font-size: 12px;
+  color: #aeaeb2;
+  letter-spacing: 4px;
+}
+
+.other-section {
+  margin-top: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.other-title {
+  font-size: 11px;
+  color: #d1d1d6;
+  letter-spacing: 3px;
 }
 
 .start-btn {
@@ -78,14 +114,13 @@ defineEmits(['start'])
   align-items: center;
   gap: 8px;
   padding: 12px 28px;
-  border: none;
   border-radius: 24px;
-  color: white;
   font-size: 15px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
   letter-spacing: 1px;
+  border: 1.5px solid transparent;
 
   &:hover {
     transform: translateY(-1px);
@@ -94,14 +129,29 @@ defineEmits(['start'])
 
   &:active { transform: translateY(0); }
 
-  &--wolf {
-    background: #1d1d1f;
-    &:hover { background: #333; }
+  &--primary {
+    background: #5856d6;
+    border-color: #5856d6;
+    color: white;
+    padding: 14px 40px;
+    font-size: 16px;
+    &:hover { background: #6e6ceb; border-color: #6e6ceb; }
   }
 
-  &--spy {
-    background: #5856d6;
-    &:hover { background: #6e6ceb; }
+  &--outline {
+    background: transparent;
+    border-color: #aeaeb2;
+    color: #1d1d1f;
+    &:hover { border-color: #5856d6; color: #5856d6; }
+  }
+
+  &--ghost {
+    background: transparent;
+    border-color: #d1d1d6;
+    color: #aeaeb2;
+    padding: 8px 20px;
+    font-size: 13px;
+    &:hover { color: #6e6e73; border-color: #aeaeb2; }
   }
 }
 
@@ -122,10 +172,6 @@ defineEmits(['start'])
 }
 
 @media (max-width: 400px) {
-  .btn-group {
-    flex-direction: column;
-    gap: 10px;
-    align-items: center;
-  }
+  .start-btn { width: 240px; justify-content: center; }
 }
 </style>

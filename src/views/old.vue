@@ -114,7 +114,7 @@
     <!-- 说明模态框 -->
     <el-dialog v-model="explainModalVisible" title="设置" width="30%" center>
       <p>
-        源码：<a href="https://github.com/syhy0612/lrsNotes" target="_blank" style="color: blue;">点击跳转</a>
+        源码：<a href="https://github.com/seiya058904/Wolf-Notes" target="_blank" style="color: blue;">点击跳转</a>
         <br><br>
         6月24日重新拾起项目。
       </p>
