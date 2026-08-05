@@ -16,7 +16,7 @@
         <button class="start-btn start-btn--ghost" @click="$emit('start', 'spy')">谁是卧底</button>
       </div>
       <div class="links">
-        <a href="https://github.com/syhy0612/lrsNotes" target="_blank">GitHub</a>
+        <a href="https://github.com/seiya058904/Wolf-Notes" target="_blank">GitHub</a>
       </div>
     </div>
   </div>

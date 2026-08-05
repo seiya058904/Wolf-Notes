@@ -68,7 +68,7 @@
       </el-radio-group>
     </el-form-item>
     <el-form-item>
-      <el-button type="primary" @click="onSubmit">Create</el-button>
+      <el-button type="primary">Create</el-button>
       <el-button>Cancel</el-button>
     </el-form-item>
   </el-form>
@@ -92,9 +92,6 @@ const sizeForm = reactive({
   desc: '',
 })
 
-function onSubmit() {
-  console.log('submit!')
-}
 </script>
 
 <style>
