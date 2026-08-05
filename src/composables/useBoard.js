@@ -2,7 +2,7 @@ import {computed, onMounted, ref, watch} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {useGameModeStore} from '@/stores/gameModeStore'
 import {storeToRefs} from 'pinia'
-import {buildStrategyPrompt, clearRoundPrivateNotes, confirmRoundPrivateNotes, createRound, createSession, defaultPrivate, inferCamp, insertSpeechTemplate, isSessionReady, loadSession, makeVoteText, markRoundPrivateNotesForReview, nextRoundMeta, privateNoteRoundCount, privateTypeForRole, resolveNextRound, saveSession, syncPrivateInfo} from '@/lib/gameSession'
+import {buildStrategyPrompt, clearRoundPrivateNotes, confirmRoundPrivateNotes, createRound, createSession, inferCamp, insertSpeechTemplate, isSessionReady, loadSession, makeVoteText, markRoundPrivateNotesForReview, nextRoundMeta, privateNoteRoundCount, privateTypeForRole, resetPrivateForRole, resolveNextRound, saveSession, syncPrivateInfo} from '@/lib/gameSession'
 
 const pad = seat => String(seat).padStart(2, '0')
 const speech = () => ({text: '', flags: {noSpeech: false, lowInformation: false, noLastWords: false}})
@@ -90,19 +90,22 @@ export function useBoard() {
   const applyPrivateReset = (nextType, privateChanged) => {
     if (privateChanged) {
       const hadNotes = session.value.game.privateNotes?.trim()
-      session.value.game.private = defaultPrivate(nextType)
+      resetPrivateForRole(session.value.game, nextType, privateChanged)
       if (hadNotes) ElMessage.info('已保留"跨身份通用补充"说明，将用于新身份的提示词')
+      return
     }
     syncPrivateInfo(session.value.game)
   }
   const roleReviewKeep = () => {
     // 保留旧身份的非公开信息，但标记为待复核：提示词中单独分段，不当作当前身份确定掌握的信息
     markRoundPrivateNotesForReview(session.value)
+    applyPrivateReset(roleReviewState.value.nextType, roleReviewState.value.privateChanged)
     roleReviewVisible.value = false; roleReviewState.value = null
     ElMessage.info('已保留轮次非公开信息并标记为待复核，请在记录台逐轮确认或编辑')
   }
   const roleReviewClear = () => {
     clearRoundPrivateNotes(session.value)
+    applyPrivateReset(roleReviewState.value.nextType, roleReviewState.value.privateChanged)
     roleReviewVisible.value = false; roleReviewState.value = null
     ElMessage.info('已清空所有轮次的非公开信息')
   }

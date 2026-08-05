@@ -1,6 +1,15 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {buildStrategyPrompt, clearRoundPrivateNotes, confirmRoundPrivateNotes, createRound, createSession, markRoundPrivateNotesForReview} from '../src/lib/gameSession.js'
+import {buildStrategyPrompt, clearRoundPrivateNotes, confirmRoundPrivateNotes, createRound, createSession, markRoundPrivateNotesForReview, resetPrivateForRole} from '../src/lib/gameSession.js'
+
+test('resetPrivateForRole replaces stale structured private data after a role switch', () => {
+  const game = {private: {type: 'wolf', knownTeammates: [3], teammateState: 'known'}, privateNotes: '通用补充', privateInfo: '旧狼人信息'}
+  resetPrivateForRole(game, 'seer', true)
+  assert.equal(game.private.type, 'seer')
+  assert.deepEqual(game.private.checks, [])
+  assert.equal(game.privateNotes, '通用补充')
+  assert.match(game.privateInfo, /尚未查验/)
+})
 
 test('markRoundPrivateNotesForReview flags only rounds with private notes and keeps content', () => {
   const session = createSession()

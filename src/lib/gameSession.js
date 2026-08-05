@@ -231,6 +231,11 @@ export function syncPrivateInfo(game = {}) {
     return game
 }
 
+export function resetPrivateForRole(game = {}, nextType, privateChanged) {
+    if (privateChanged) game.private = defaultPrivate(nextType)
+    return syncPrivateInfo(game)
+}
+
 // 私有信息状态是否已确认：不要求必须有技能结果（"尚未发生/暂不确定/无额外信息"也算确认），
 // 但用户必须主动表态，不能完全无反馈地跳过。
 export function isPrivateInfoConfirmed(data = {}) {
