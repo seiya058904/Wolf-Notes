@@ -4,14 +4,14 @@
       <img src="../assets/wechat_bg.jpg" alt="请点击右上角，选择在浏览器中打开" class="wechat_bg">
     </div>
     <div v-else class="container">
-      <Board @go-home="$emit('go-home')"/>
+      <Board @go-home="$emit('go-home')" @missing-setup="$emit('missing-setup')"/>
     </div>
   </div>
 </template>
 
 <script setup>
 import {computed} from 'vue'
-const emit = defineEmits(['go-home'])
+const emit = defineEmits(['go-home', 'missing-setup'])
 import Board from '../components/board.vue'
 import {useDeviceDetect} from '@/composables/useDeviceDetect'
 import {useBackground} from '@/composables/useBackground'

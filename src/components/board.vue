@@ -1,433 +1,203 @@
 <template>
-  <div class="board" :class="{ 'is-fullscreen': isFullScreen, 'has-bg': hasBackground }">
-    <!-- 顶部工具栏 -->
-    <div class="toolbar">
-      <button class="tool-btn" @click="goHome" title="首页">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-      </button>
-      <span class="toolbar-label">
-        当前版型：<a href="#" @click.prevent="openSettings">{{ selectedMode ? selectedMode.name : '点击选择' }}</a>
-      </span>
-      <div class="toolbar-actions">
-        <el-dropdown trigger="click" @command="handleBackgroundCommand">
-          <button class="tool-btn" title="背景设置" style="outline: none">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-          </button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="upload">上传图片</el-dropdown-item>
-              <el-dropdown-item command="starry">游戏背景</el-dropdown-item>
-              <el-dropdown-item command="white">纯白背景</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-        <button class="tool-btn fullscreen-btn" @click="toggleFullScreen" :title="isFullScreen ? '退出全屏' : '全屏模式'">
-          <svg v-if="!isFullScreen" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-          <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+  <main class="board">
+    <header class="topbar">
+      <button class="home" type="button" @click="$emit('go-home')">返回</button>
+      <button class="mode" type="button" @click="openSettings">{{ selectedMode?.name || '选择版型' }}</button>
+      <el-tooltip :content="`当前主题：${themeText}`" placement="bottom"><button class="theme" type="button" @click="cycleTheme">主题</button></el-tooltip>
+      <div class="top-actions">
+        <button type="button" @click="showSettings = true">我的信息</button>
+        <button class="primary" type="button" @click="showPrompt = true"><span class="full-label">生成 AI 策略提示词</span><span class="short-label">AI策略</span></button>
+      </div>
+    </header>
+    <p v-if="modeDesc" class="mode-desc">{{ modeDesc }}</p>
+
+    <section class="round-bar">
+      <button type="button" class="arrow" title="上一阶段" @click="prevRound">‹</button>
+      <div class="round-tabs">
+        <button
+          v-for="item in session.rounds"
+          :key="item.id"
+          type="button"
+          :class="{active: item.id === session.currentRoundId}"
+          :title="item.isCustom ? '自定义轮次' : item.label"
+          @click="session.currentRoundId = item.id"
+        >
+          {{ item.label }}
         </button>
       </div>
-    </div>
+      <button v-if="isLastRound" type="button" class="next" @click="nextRound">进入{{ nextLabel }}</button>
+      <button v-else type="button" class="arrow" :title="`切换到${nextLabel}`" @click="nextRound">›</button>
+      <el-dropdown trigger="click" @command="handleRoundCommand">
+        <button type="button" class="more">···</button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="rename">重命名当前轮次</el-dropdown-item>
+            <el-dropdown-item command="add-custom">添加自定义轮次</el-dropdown-item>
+            <el-dropdown-item command="delete" divided>删除当前轮次</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+    </section>
 
-    <!-- 版型提示条 -->
-    <div class="rule-bar" v-if="showRules && modeDesc">
-      <div class="rule-content">
-        <span class="rule-tag">版型</span>
-        <span>{{ modeDesc }}</span>
-      </div>
-      <button class="rule-close" @click="showRules = false">×</button>
-    </div>
-
-    <!-- 内容区 -->
-    <div class="board-body">
-      <!-- 自记信息 -->
-      <div class="section section--notes">
-        <div class="section-head">
-          <span class="section-label">自记信息</span>
-          <div class="section-acts">
-            <button class="act-btn" @click="resetRemarks" title="重置">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.5 15.5A9 9 0 1 1 21 7.5L23 10"/></svg>
-            </button>
-            <button class="act-btn" @click="exportInfo" title="导出">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            </button>
-          </div>
-        </div>
-        <el-input v-model="remarks" type="textarea" :rows="notesRows" placeholder="写下你的分析和推理..." @blur="handleBlur(null)"/>
-      </div>
-
-      <!-- 发言信息 -->
-      <div class="section section--players">
-        <div class="section-head">
-          <span class="section-label">发言信息</span>
-          <div class="section-acts">
-            <button class="act-btn" @click="resetTalks" title="重置">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.5 15.5A9 9 0 1 1 21 7.5L23 10"/></svg>
-            </button>
-            <button class="act-btn" @click="handUp" title="一键上警">
-              <el-icon size="13"><LittleHand/></el-icon>
-            </button>
-          </div>
-        </div>
-        <div class="players-grid">
-          <div class="players-col">
-            <PlayerCard
-                v-for="i in 6" :key="`p${i}`"
-                :player="chatRecords[playerKey(i)]"
-                :player-number="pad(i)"
-                :options="options" :rows="playerRows" placement="right"
-                :compact="isFullScreen"
-                @update:role="(r) => updatePlayerRole(playerKey(i), r)"
-                @blur="handleBlur(playerKey(i))"
-            />
-          </div>
-          <div class="players-col">
-            <PlayerCard
-                v-for="i in 6" :key="`p${i+6}`"
-                :player="chatRecords[playerKey(i+6)]"
-                :player-number="pad(i+6)"
-                :options="options" :rows="playerRows" placement="left"
-                :compact="isFullScreen"
-                @update:role="(r) => updatePlayerRole(playerKey(i+6), r)"
-                @blur="handleBlur(playerKey(i+6))"
-            />
-          </div>
+    <section class="workspace">
+      <!-- 夜间模式默认隐藏发言区 -->
+      <div v-if="currentRound.period === 'day'" class="speeches-panel"><div class="section-title"><div><span>本轮发言</span><small>原话优先，模板会直接插入发言框</small></div><el-select v-model="templateTarget" size="small" placeholder="模板目标"><el-option v-for="seat in 12" :key="seat" :label="`${seat}号`" :value="seat"/></el-select></div><div class="players-grid"><PlayerCard v-for="seat in 12" :key="seat" :seat="seat" :player="session.players[seat]" :speech="getSpeech(seat)" @update:text="value => updateSpeech(seat, value)" @toggle:flag="flag => toggleFlag(seat, flag)" @insert:template="type => insertTemplate(seat, type, templateTarget)" @update:life="value => setPlayerStatus(seat, 'lifeStatus', value)" @update:election="value => setPlayerStatus(seat, 'electionStatus', value)"/></div></div>
+      <div v-else class="speeches-panel collapsed">
+        <button type="button" class="show-speeches" @click="openSections.speeches = true">显示玩家备注</button>
+        <div v-if="openSections.speeches" class="players-grid">
+          <PlayerCard v-for="seat in 12" :key="seat" :seat="seat" :player="session.players[seat]" :speech="getSpeech(seat)" @update:text="value => updateSpeech(seat, value)" @toggle:flag="flag => toggleFlag(seat, flag)" @insert:template="type => insertTemplate(seat, type, templateTarget)" @update:life="value => setPlayerStatus(seat, 'lifeStatus', value)" @update:election="value => setPlayerStatus(seat, 'electionStatus', value)"/>
         </div>
       </div>
-    </div>
+      <aside class="notes-panel">
+        <!-- 夜间模式：非公开信息在前 -->
+        <section v-if="currentRound.period === 'night'" class="notes-section">
+          <button type="button" class="collapse-title" @click="toggleSection('private')">
+            <span>本轮非公开信息</span><small>仅供你和 AI 分析使用，其他玩家未必知道</small><em class="badge">{{ privateBadge }}</em>
+          </button>
+          <div v-show="openSections.private" class="collapse-body">
+            <el-input v-model="currentRound.privateNotes" type="textarea" :rows="5" placeholder="例如：第一夜狼队最终刀11号。"/>
+          </div>
+        </section>
+        <section v-if="currentRound.period === 'day'" class="notes-section">
+          <button type="button" class="collapse-title" @click="toggleSection('public')">
+            <span>本轮公共信息</span><small>只记死亡、放逐、警徽和票型等确定事实</small><em class="badge">{{ publicBadge }}</em>
+          </button>
+          <div v-show="openSections.public" class="collapse-body">
+            <div class="event-templates"><button v-for="item in eventTemplates" :key="item.key" type="button" @click="insertPublic(item.key)">{{ item.label }}</button><button type="button" @click="showVote = true">票型助手</button></div>
+            <el-input v-model="currentRound.publicEvents" type="textarea" :rows="6" placeholder="例如：1号和11号昨夜死亡。4号被放逐。"/>
+          </div>
+        </section>
+        <section v-if="currentRound.period === 'night'" class="notes-section">
+          <button type="button" class="collapse-title" @click="toggleSection('public')">
+            <span>本轮公共信息</span><small>只记死亡、放逐、警徽和票型等确定事实</small><em class="badge">{{ publicBadge }}</em>
+          </button>
+          <div v-show="openSections.public" class="collapse-body">
+            <div class="event-templates"><button v-for="item in eventTemplates" :key="item.key" type="button" @click="insertPublic(item.key)">{{ item.label }}</button><button type="button" @click="showVote = true">票型助手</button></div>
+            <el-input v-model="currentRound.publicEvents" type="textarea" :rows="6" placeholder="例如：1号和11号昨夜死亡。4号被放逐。"/>
+          </div>
+        </section>
+        <section v-if="currentRound.period === 'day'" class="notes-section">
+          <button type="button" class="collapse-title" @click="toggleSection('private')">
+            <span>本轮非公开信息</span><small>仅供你和 AI 分析使用，其他玩家未必知道</small><em class="badge">{{ privateBadge }}</em>
+          </button>
+          <div v-show="openSections.private" class="collapse-body">
+            <el-input v-model="currentRound.privateNotes" type="textarea" :rows="5" placeholder="例如：第一夜狼队最终刀11号。"/>
+          </div>
+        </section>
+        <section class="notes-section">
+          <button type="button" class="collapse-title" @click="toggleSection('notes')">
+            <span>整体备注</span><small>不属于某一轮的补充判断</small><em class="badge">{{ notesBadge }}</em>
+          </button>
+          <div v-show="openSections.notes" class="collapse-body">
+            <el-input v-model="session.overallNotes" type="textarea" :rows="4" placeholder="写下你的整体判断…"/>
+          </div>
+        </section>
+        <button class="danger" type="button" @click="resetGame">清空整局</button>
+      </aside>
+    </section>
 
-    <!-- 对话框 -->
-    <el-dialog v-model="showGameSettings" title="版型设置" :close-on-click-modal="false"
-               :close-on-press-escape="false" :before-close="handleSettingsClose" width="520px"
-               class="settings-dialog">
-      <GameSettings ref="gameSettingsRef" @close="showGameSettings = false"/>
-    </el-dialog>
-
-    <el-dialog v-model="showExportDialog" title="导出笔记" :close-on-click-modal="false" width="520px">
-      <el-input v-model="exportedInfo" type="textarea" :rows="20"/>
-      <template #footer>
-        <el-button type="primary" @click="copyExportedInfo">复制到剪贴板</el-button>
-      </template>
-    </el-dialog>
-  </div>
+    <el-dialog v-model="showSettings" title="我的信息" width="540px"><div class="settings-form"><div class="setting-row"><label>我的座位</label><el-select v-model="session.game.mySeat" placeholder="选择座位"><el-option v-for="n in 12" :key="n" :label="`${n}号`" :value="n"/></el-select></div><div class="setting-row"><label>真实身份</label><el-select :model-value="session.game.myRole" filterable allow-create placeholder="真实身份" @update:model-value="updateRole"><el-option v-for="(role, index) in availableRoles" :key="index" :label="role" :value="role"/></el-select></div><div class="setting-row"><label>阵营</label><el-select v-model="session.game.myCamp" placeholder="阵营（身份未知时选择）"><el-option label="好人" value="好人"/><el-option label="狼人" value="狼人"/><el-option label="第三方" value="第三方"/></el-select></div><div class="setting-row"><label>私有信息</label><PrivateInfoForm v-if="session.game.private" v-model:value="session.game.private" :seat="session.game.mySeat"/></div><div class="setting-row"><label>跨身份通用补充</label><el-input v-model="session.game.privateNotes" type="textarea" :rows="3" placeholder="切换身份后仍会保留并交给 AI，请勿填写身份专属信息"/></div></div></el-dialog>
+    <el-dialog v-model="roleReviewVisible" title="身份切换复核" width="520px"><template v-if="roleReviewState"><p class="role-review-text">身份已从 <strong>{{ roleReviewState.prevRole || '未设置' }}</strong> 修改为 <strong>{{ roleReviewState.nextRole }}</strong>。</p><p class="role-review-text">当前有 <strong>{{ roleReviewState.privateRoundCount }}</strong> 个轮次包含非公开信息，其中可能存在仅原身份能够知道的内容（例如狼队刀口、查验结果、用药等）。</p></template><template #footer><el-button @click="roleReviewCancel">取消修改</el-button><el-button type="warning" @click="roleReviewClear">清空轮次非公开信息</el-button><el-button type="primary" @click="roleReviewKeep">保留并自行检查</el-button></template></el-dialog>
+    <el-dialog v-model="showVote" title="票型助手（可选）" width="560px"><p class="tip">生成后仍是一段可编辑的公共事件文本。</p><div v-for="(group, index) in voteGroups" :key="index" class="vote-row"><el-select v-model="group.target" placeholder="被投玩家"><el-option v-for="seat in 12" :key="seat" :label="`${seat}号`" :value="seat"/></el-select><el-select v-model="group.voters" multiple placeholder="投票玩家"><el-option v-for="seat in 12" :key="seat" :label="`${seat}号`" :value="seat"/></el-select><button type="button" @click="voteGroups.splice(index, 1)">移除</button></div><button type="button" @click="voteGroups.push({target: null, voters: []})">新增目标</button><div class="vote-row"><el-select v-model="abstainers" multiple placeholder="弃票玩家"><el-option v-for="seat in 12" :key="seat" :label="`${seat}号`" :value="seat"/></el-select><el-select v-model="exiled" placeholder="最终放逐"><el-option v-for="seat in 12" :key="seat" :label="`${seat}号`" :value="seat"/></el-select></div><template #footer><el-button @click="showVote = false">取消</el-button><el-button type="primary" @click="submitVote">生成票型文本</el-button></template></el-dialog>
+    <el-dialog v-model="showPrompt" title="AI 策略提示词" width="760px"><div class="prompt-options"><el-checkbox v-model="promptOptions.compactEarlierRounds">紧凑早期轮次</el-checkbox><el-input-number v-model="promptOptions.maxCharacters" :min="1" placeholder="字符上限（可选）" controls-position="right"/></div><el-input :model-value="prompt" type="textarea" :rows="22" readonly/><template #footer><el-button @click="showPrompt = false">关闭</el-button><el-button type="primary" @click="copyPrompt">复制提示词</el-button></template></el-dialog>
+    <el-dialog v-model="showGameSettings" title="版型设置" width="520px"><GameSettings ref="gameSettingsRef"/></el-dialog>
+  </main>
 </template>
 
 <script setup>
-import {ref, computed, onMounted, onUnmounted} from 'vue'
+import {computed, onMounted, ref, watch} from 'vue'
+import {ElMessageBox} from 'element-plus'
 import {useBoard} from '@/composables/useBoard'
-import {useBackground} from '@/composables/useBackground'
 import PlayerCard from './PlayerCard.vue'
 import GameSettings from './gameSettings.vue'
-import LittleHand from '@/assets/little-hand.svg?component'
-const emit = defineEmits(['go-home'])
-const {uploadBackground, clearBackground, setDefaultStarry, backgroundImage} = useBackground()
-const hasBackground = computed(() => !!backgroundImage.value)
-
-const showRules = ref(true)
-
-const handleBackgroundCommand = (cmd) => {
-  if (cmd === 'upload') uploadBackground()
-  else if (cmd === 'starry') setDefaultStarry()
-  else if (cmd === 'white') clearBackground()
+import PrivateInfoForm from './privateInfoForm.vue'
+import {aliasRole, defaultPrivate, privateTypeForRole} from '@/lib/gameSession'
+const emit = defineEmits(['go-home', 'missing-setup'])
+const {session, selectedMode, modeDesc, currentRound, showSettings, showPrompt, showVote, showGameSettings, gameSettingsRef, gateBlocked, promptOptions, prompt, getSpeech, updateSpeech, toggleFlag, insertTemplate, setPlayerStatus, insertPublic, nextRound, prevRound, nextLabel, isLastRound, addCustomRound, renameCurrentRound, deleteRound, makeVote, updateRole, roleReviewVisible, roleReviewState, roleReviewKeep, roleReviewClear, roleReviewCancel, copyPrompt, resetGame, openSettings} = useBoard()
+const templateTarget = ref(null), voteGroups = ref([{target: null, voters: []}]), abstainers = ref([]), exiled = ref(null)
+// 移动端三输入区默认收起（桌面默认展开）
+const openSections = ref({public: true, private: true, notes: true, speeches: false})
+onMounted(() => {
+  if (window.matchMedia('(max-width: 720px)').matches) openSections.value = {public: false, private: false, notes: false}
+})
+const toggleSection = key => { openSections.value[key] = !openSections.value[key] }
+const countLines = text => (text || '').split('\n').filter(Boolean).length
+const publicBadge = computed(() => { const n = countLines(currentRound.value?.publicEvents); return n ? `已记录 ${n} 项` : '未记录' })
+const privateBadge = computed(() => { const n = countLines(currentRound.value?.privateNotes); return n ? `已记录 ${n} 项` : '未记录' })
+const notesBadge = computed(() => countLines(session.value.overallNotes) ? '已记录' : '未记录')
+const eventTemplates = [{key: 'death', label: '死亡'}, {key: 'exile', label: '放逐'}, {key: 'selfDestruct', label: '自爆'}, {key: 'sheriff', label: '警长'}, {key: 'withdrawn', label: '退水'}, {key: 'vote', label: '票型'}]
+// 身份选项：版型角色显示全称（存储全称，与阵营映射/私有信息类型兼容）
+const availableRoles = computed(() => selectedMode.value?.roles?.map(role => aliasRole(role.text)) || [])
+const themeText = computed(() => ({system: '跟随系统', light: '白色', dark: '黑色'}[session.value.uiPreferences?.theme || 'system']))
+const cycleTheme = () => { const current = session.value.uiPreferences.theme || 'system'; session.value.uiPreferences.theme = {system: 'light', light: 'dark', dark: 'system'}[current] }
+const handleRoundCommand = async command => {
+    if (command === 'rename') {
+        try {
+            const {value} = await ElMessageBox.prompt('输入新的轮次名称', '重命名当前轮次', {inputValue: currentRound.value?.label || '', inputPlaceholder: '轮次名称', confirmButtonText: '确定', cancelButtonText: '取消'})
+            if (value !== null && value.trim()) renameCurrentRound(value)
+        } catch { /* 取消 */ }
+    } else if (command === 'add-custom') {
+        try {
+            const {value} = await ElMessageBox.prompt('用于特殊玩法或复盘细分，如"第一天警上"', '添加自定义轮次', {inputPlaceholder: '自定义轮次名称', confirmButtonText: '添加', cancelButtonText: '取消'})
+            if (value !== null && value.trim()) addCustomRound(value)
+        } catch { /* 取消 */ }
+    } else if (command === 'delete') {
+        deleteRound()
+    }
 }
-
-const {
-  selectedMode, remarks, chatRecords, showExportDialog, exportedInfo,
-  showGameSettings, gameSettingsRef, options, modeDesc,
-  handleBlur, resetRemarks, resetTalks, handUp, exportInfo,
-  copyExportedInfo, handleSettingsClose, openSettings, updatePlayerRole
-} = useBoard()
-
-// 工具函数
-const pad = (n) => String(n).padStart(2, '0')
-const playerKey = (n) => `player${pad(n)}`
-
-// 全屏管理
-const isFullScreen = ref(false)
-
-const toggleFullScreen = () => {
-  if (!isFullScreen.value) {
-    const el = document.documentElement
-    if (el.requestFullscreen) el.requestFullscreen()
-    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen()
-  } else {
-    if (document.exitFullscreen) document.exitFullscreen()
-    else if (document.webkitExitFullscreen) document.webkitExitFullscreen()
+const submitVote = () => { makeVote(voteGroups.value, abstainers.value, exiled.value); voteGroups.value = [{target: null, voters: []}]; abstainers.value = []; exiled.value = null }
+// 记录台访问门禁：加载后发现开局信息不完整，通知上层返回开局设置
+watch(gateBlocked, blocked => { if (blocked) emit('missing-setup') })
+// 打开"我的信息"时确保结构化私有信息存在；旧数据无 private 时按身份初始化，历史文本迁入跨身份通用补充
+watch(showSettings, open => {
+  if (open && !session.value.game.private) {
+    const oldText = session.value.game.privateInfo?.trim()
+    session.value.game.private = defaultPrivate(privateTypeForRole(session.value.game.myRole))
+    if (oldText && !session.value.game.privateNotes) session.value.game.privateNotes = oldText
   }
-}
-
-const handleFsChange = () => {
-  isFullScreen.value = !!document.fullscreenElement
-}
-
-onMounted(() => document.addEventListener('fullscreenchange', handleFsChange))
-onUnmounted(() => document.removeEventListener('fullscreenchange', handleFsChange))
-
-// 自适应行数
-const notesRows = computed(() => isFullScreen.value ? 28 : 3)
-const playerRows = computed(() => isFullScreen.value ? 5 : 3)
-
-const goHome = () => emit('go-home')
+})
 </script>
 
 <style scoped lang="scss">
-.board {
+.board{max-width:1240px;margin:0 auto;padding:18px;color:var(--text-primary)}button{font:inherit}.topbar,.round-bar,.section-title,.round-tools,.top-actions{display:flex;align-items:center;gap:8px}.top-actions{margin-left:auto}.topbar button,.round-bar>button,.round-tools button,.event-templates button,.danger,.collapse-title{border:1px solid var(--border-color);border-radius:9px;background:var(--bg-card);color:var(--text-primary);padding:8px 10px;cursor:pointer}.mode{font-weight:700;font-size:18px}.primary{background:var(--accent)!important;color:white!important;border-color:var(--accent)!important}.short-label{display:none}.mode-desc{color:var(--text-primary);font-size:13px;font-weight:500;margin:10px 0}.round-bar{flex-wrap:wrap;background:var(--bg-card);border:1px solid var(--border-color);border-radius:14px;padding:10px;margin-bottom:12px}.round-bar .arrow{padding:5px 10px}.round-tabs{display:flex;gap:5px;overflow:auto;max-width:100%;flex:1}.round-tabs button{white-space:nowrap;border:0;background:var(--bg-input);color:var(--text-secondary);border-radius:7px;padding:7px 9px;cursor:pointer}.round-tabs button.active{background:var(--accent);color:white}.next{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important;font-weight:600}.more{padding:5px 10px;letter-spacing:1px}.workspace{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px}.speeches-panel,.notes-panel section{background:var(--bg-card);border:1px solid var(--border-color);border-radius:14px;padding:12px}.section-title{justify-content:space-between;margin-bottom:10px}.section-title span{display:block;font-weight:700}.section-title small{display:block;color:var(--text-muted);font-size:11px;margin-top:2px}.players-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.notes-panel{display:flex;flex-direction:column;gap:12px}.notes-section{padding:0}.collapse-title{display:flex;flex-wrap:wrap;align-items:center;gap:6px;width:100%;text-align:left;border:0;border-radius:10px;background:transparent}.collapse-title span{font-weight:700;font-size:14px}.collapse-title small{color:var(--text-muted);font-size:11px;flex:1;min-width:120px}.collapse-title .badge{font-style:normal;font-size:11px;color:var(--accent);border:1px solid var(--border-color);border-radius:999px;padding:2px 8px;background:var(--bg-input)}.collapse-body{padding-top:10px}.event-templates{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.event-templates button{padding:5px 7px;font-size:12px}.danger{color:#bd3b3b}.settings-form{display:flex;flex-direction:column;gap:12px}.setting-row{display:flex;flex-direction:column;gap:6px}.setting-row label{font-size:13px;font-weight:600;color:var(--text-secondary)}.vote-row{display:flex;gap:8px;align-items:center;margin:9px 0}.vote-row .el-select{flex:1}.tip{color:var(--text-secondary);font-size:13px}.prompt-options{display:flex;gap:12px;align-items:center;margin-bottom:10px}.prompt-options .el-input-number{width:190px}
+/* 发言/公共/非公开/备注输入区统一深色表面（浅色主题下即浅色输入区） */
+:deep(.el-textarea__inner){background:var(--bg-input);color:var(--text-primary);border-color:var(--border-color)}
+:deep(.el-textarea__inner::placeholder){color:var(--text-muted)}
+
+/* 夜间模式发言区折叠样式 */
+.speeches-panel.collapsed {
+  padding: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+}
+
+.show-speeches {
   width: 100%;
-  max-width: 920px;
-  margin: 0 auto;
-  padding: 16px;
-}
-
-/* ---- 工具栏 ---- */
-.toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-  padding: 0 2px;
-}
-
-.toolbar-label {
-  font-size: 13px;
-  color: var(--text-secondary);
-  a {
-    color: var(--text-primary);
-    font-weight: 600;
-    &:hover { text-decoration: underline; }
-  }
-}
-
-.toolbar-actions { display: flex; gap: 4px; }
-
-/* ---- 版型提示 ---- */
-.rule-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: rgba(88, 86, 214, 0.08);
-  border: 1px solid rgba(88, 86, 214, 0.15);
-  border-radius: 10px;
-  padding: 8px 14px;
-  margin-bottom: 12px;
-  font-size: 12px;
-  color: #5856d6;
-}
-
-.rule-content {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.rule-tag {
-  background: #5856d6;
+  background: var(--accent);
   color: white;
-  padding: 1px 8px;
-  border-radius: 4px;
-  font-weight: 600;
-  font-size: 11px;
-  flex-shrink: 0;
-}
-
-.rule-close {
   border: none;
-  background: none;
-  font-size: 18px;
-  color: #5856d6;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 500;
   cursor: pointer;
-  padding: 0 4px;
-  opacity: 0.6;
-  &:hover { opacity: 1; }
 }
 
-.tool-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px; height: 30px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background: var(--bg-card);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: var(--transition);
-  &:hover { border-color: var(--border-hover); color: var(--text-primary); box-shadow: var(--shadow-sm); }
-  &--danger:hover { color: #e55; border-color: rgba(238,85,85,0.3); }
+.show-speeches:hover {
+  background: var(--accent-dark, var(--accent));
 }
 
-/* ---- 区域卡片 ---- */
-.section {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 14px 16px;
-  margin-bottom: 12px;
-  box-shadow: var(--shadow-sm);
+.collapsed .players-grid {
+  margin-top: 12px;
 }
+@media(max-width:720px){.board{padding:10px 8px}.topbar{align-items:center;flex-wrap:wrap;gap:6px}.mode{font-size:15px;order:0}.top-actions{width:100%;justify-content:space-between;margin-left:0}.top-actions .primary{flex:1}.full-label{display:none}.short-label{display:inline}.home,.theme{padding:6px 9px}.workspace{grid-template-columns:1fr}.players-grid{grid-template-columns:1fr}.round-tools .el-input{max-width:none;flex:1}.section-title .el-select{width:110px}.prompt-options{align-items:flex-start;flex-direction:column}}
+</style>
 
-.section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.section-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.section-acts { display: flex; gap: 4px; }
-
-.act-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px; height: 26px;
-  border: none;
-  border-radius: 5px;
-  background: var(--bg-input);
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: var(--transition);
-  &:hover { background: #e8e8ed; color: var(--text-primary); }
-}
-
-/* ---- 玩家网格 ---- */
-.players-grid { display: flex; gap: 14px; }
-.players-col { flex: 1; }
-
-/* ---- 全屏模式 ---- */
-.is-fullscreen {
-  max-width: 100%;
-  padding: 10px;
-  height: 100vh !important; /* Force to take full vertical viewport */
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-primary);
-
-  .board-body {
-    flex-direction: row;
-    gap: 12px;
-    flex: 1;
-    min-height: 0; /* Enable flex child shrinking */
-  }
-
-  .section {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-  }
-
-  .section--notes {
-    order: 2;
-    flex: 1;
-    margin-bottom: 0;
-  }
-
-  .section--players {
-    order: 1;
-    flex: 2;
-  }
-
-  .players-grid {
-    flex: 1;
-    min-height: 0;
-    height: 100%; /* Force height inheritance */
-  }
-
-  .players-col {
-    display: flex;
-    flex-direction: column;
-    gap: 8px; /* Use gap so we can remove margin */
-    height: 100%; /* Ensure column stretches */
-  }
-
-  :deep(.player-card) {
-    flex: 1;
-    margin-bottom: 0 !important;
-  }
-  :deep(.player-right) {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-  }
-  :deep(.player-right .el-mention),
-  :deep(.player-right .el-textarea) {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-  }
-  :deep(.player-right .el-textarea__inner) {
-    flex: 1;
-  }
-
-  .section--notes :deep(.el-textarea) {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-  }
-  .section--notes :deep(.el-textarea__inner) {
-    flex: 1;
-    resize: none !important;
-  }
-}
-
-.board-body {
-  display: flex;
-  flex-direction: column;
-}
-
-:deep(.el-textarea__inner) {
-  resize: none !important;
-  border-radius: var(--radius-sm);
-}
-
-@media (max-width: 768px) {
-  .board { padding: 10px; }
-  .players-grid { gap: 6px; }
-  .section { padding: 10px 12px; }
-}
-
-/* ---- 有背景图时的毛玻璃效果 ---- */
-.has-bg {
-  .toolbar {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-radius: var(--radius-sm);
-    padding: 6px 10px;
-    margin-bottom: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.4);
-  }
-
-  .section {
-    background: rgba(255, 255, 255, 0.75);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
-  }
-
-  .tool-btn {
-    background: rgba(255, 255, 255, 0.6);
-    border-color: rgba(255, 255, 255, 0.4);
-  }
-
-  .act-btn {
-    background: rgba(255, 255, 255, 0.5);
-  }
-
-  :deep(.el-textarea__inner) {
-    background: rgba(255, 255, 255, 0.5) !important;
-    border-color: rgba(255, 255, 255, 0.4) !important;
-  }
-}
-
-@media (max-width: 600px) {
-  .fullscreen-btn {
-    display: none !important;
-  }
-}
+<style lang="scss">
+/* 弹窗（含提示词）在两种主题下使用主题表面，避免深色主题出现大片白色 */
+.el-dialog{background:var(--bg-card);color:var(--text-primary)}
+.el-dialog__title{color:var(--text-primary)}
+.el-dialog .el-textarea__inner{background:var(--bg-input);color:var(--text-primary);border-color:var(--border-color)}
+.el-dialog .el-textarea__inner::placeholder{color:var(--text-muted)}
+.el-message-box{background:var(--bg-card);color:var(--text-primary)}
 </style>

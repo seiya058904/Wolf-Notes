@@ -1,255 +1,118 @@
-import {ref, computed, watch, onMounted, onUnmounted} from 'vue'
-import handUpImage from '@/assets/hand-up.svg?url'
-import handDownImage from '@/assets/hand-down.svg?url'
-import handOffImage from '@/assets/hand-off.svg?url'
+import {computed, onMounted, ref, watch} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {useGameModeStore} from '@/stores/gameModeStore'
 import {storeToRefs} from 'pinia'
+import {buildStrategyPrompt, clearRoundPrivateNotes, createRound, createSession, defaultPrivate, inferCamp, insertSpeechTemplate, isSessionReady, loadSession, makeVoteText, nextRoundMeta, privateNoteRoundCount, privateTypeForRole, resolveNextRound, saveSession, syncPrivateInfo} from '@/lib/gameSession'
 
-/**
- * 共享的笔记面板逻辑
- * 被 board.vue 和 board-full.vue 共同使用
- */
+const pad = seat => String(seat).padStart(2, '0')
+const speech = () => ({text: '', flags: {noSpeech: false, lowInformation: false, noLastWords: false}})
+const templates = {death: '昨夜死亡：', exile: '被放逐：', selfDestruct: '自爆：', sheriff: '警徽：', withdrawn: '退水：', vote: '票型：'}
+
 export function useBoard() {
-    const store = useGameModeStore()
-    const {selectedMode} = storeToRefs(store)
+  const store = useGameModeStore()
+  const {selectedMode} = storeToRefs(store)
+  const session = ref(createSession())
+  const hydrated = ref(false)
+  // 记录台访问门禁：加载后开局信息不完整时置为 true，通知上层转开局设置
+  const gateBlocked = ref(false)
+  const showSettings = ref(false), showPrompt = ref(false), showVote = ref(false), showPrivate = ref(false), showGameSettings = ref(false), gameSettingsRef = ref(null)
+  const promptOptions = ref({scope: 'all', compactEarlierRounds: false, maxCharacters: null})
+  const currentRound = computed(() => session.value.rounds.find(item => item.id === session.value.currentRoundId) || session.value.rounds[0])
+  const prompt = computed(() => buildStrategyPrompt(session.value, {...promptOptions.value, gameMode: selectedMode.value}))
+  const modeDesc = computed(() => selectedMode.value?.roles?.map(role => `${role.count > 1 ? role.count : ''}${role.text}`).join('·') || '')
+  const persist = () => { if (!saveSession(window.localStorage, session.value)) ElMessage.warning('本地保存失败，内容仍保留在当前页面') }
+  const applyTheme = theme => document.documentElement.dataset.theme = theme === 'system' ? '' : theme
 
-    // 自记信息
-    const remarks = ref('')
+  onMounted(() => {
+    session.value = loadSession(window.localStorage)
+    // 不静默补齐任何开局信息；缺失时置 gateBlocked，由上层引导回开局设置
+    gateBlocked.value = !isSessionReady(session.value.game)
+    hydrated.value = true
+    applyTheme(session.value.uiPreferences?.theme || 'system')
+  })
+  watch(session, () => { if (hydrated.value) persist() }, {deep: true})
+  watch(selectedMode, mode => { if (mode) session.value.game.modeId = mode.id })
+  watch(() => session.value.uiPreferences?.theme, value => applyTheme(value || 'system'))
 
-    // 发言信息
-    const chatRecords = ref(
-        Object.fromEntries(
-            Array.from({length: 12}, (_, i) => {
-                const playerKey = `player${String(i + 1).padStart(2, '0')}`
-                return [playerKey, {
-                    election: 3,   // 上警信息 1-警上刚手, 2-警上放手, 3-警下
-                    flag: true,    // 是否存在（非12人场预留）
-                    message: '',   // 发言信息
-                    sign: '',      // 标记信息 如 '狼', '民'
-                    status: 1,     // 存活状态 1-存活, 2-放逐出局, 3-其他死亡
-                }]
-            })
-        )
-    )
-
-    // 导出相关
-    const showExportDialog = ref(false)
-    const exportedInfo = ref('')
-
-    // 版型设置
-    const showGameSettings = ref(false)
-    const showSettings = ref(false)
-    const gameSettingsRef = ref(null)
-
-    // 响应式对话框宽度
-    const windowWidth = ref(window.innerWidth)
-    const dialogWidth = computed(() => windowWidth.value >= 768 ? '50%' : '80%')
-
-    const handleResize = () => {
-        windowWidth.value = window.innerWidth
+  const getSpeech = seat => currentRound.value.speeches[seat] || (currentRound.value.speeches[seat] = speech())
+  const updateSpeech = (seat, value) => { getSpeech(seat).text = value }
+  const toggleFlag = (seat, key) => { const item = getSpeech(seat); item.flags[key] = !item.flags[key] }
+  const insertTemplate = (seat, type, target) => { getSpeech(seat).text = insertSpeechTemplate(getSpeech(seat).text, type, target) }
+  const setPlayerStatus = (seat, key, value) => { session.value.players[seat][key] = value }
+  const insertPublic = type => { currentRound.value.publicEvents = [currentRound.value.publicEvents.trim(), templates[type]].filter(Boolean).join(currentRound.value.publicEvents.trim() ? '\n' : '') }
+  // 轮次自动推进：夜→日→夜→日；列表中间只切换，末尾才创建新阶段
+  const currentIndex = computed(() => session.value.rounds.findIndex(item => item.id === currentRound.value.id))
+  const isLastRound = computed(() => currentIndex.value === session.value.rounds.length - 1)
+  const nextLabel = computed(() => {
+    if (!isLastRound.value) return session.value.rounds[currentIndex.value + 1]?.label || ''
+    const lastStandard = [...session.value.rounds].reverse().find(item => !item.isCustom)
+    return nextRoundMeta(lastStandard || {dayNumber: 1, period: 'night'}).label
+  })
+  const nextRound = () => {
+    const decision = resolveNextRound(session.value.rounds, session.value.currentRoundId)
+    if (decision.type === 'switch') { if (decision.target) session.value.currentRoundId = decision.target }
+    else { const item = createRound(decision.meta); session.value.rounds.push(item); session.value.currentRoundId = item.id }
+  }
+  const prevRound = () => { if (currentIndex.value > 0) session.value.currentRoundId = session.value.rounds[currentIndex.value - 1].id }
+  const addCustomRound = label => { const name = label?.trim() || `自定义轮次${session.value.rounds.length + 1}`; const item = createRound({label: name, isCustom: true}); session.value.rounds.push(item); session.value.currentRoundId = item.id }
+  const renameCurrentRound = label => { const name = label?.trim(); if (name && currentRound.value) currentRound.value.label = name }
+  const deleteRound = async () => {
+    const item = currentRound.value
+    if (!item || session.value.rounds.length <= 1) return ElMessage.warning('至少保留一个轮次')
+    const hasContent = item.publicEvents?.trim() || item.privateNotes?.trim() || Object.values(item.speeches || {}).some(value => value.text?.trim() || Object.values(value.flags || {}).some(Boolean))
+    const remove = () => { const index = session.value.rounds.findIndex(roundItem => roundItem.id === item.id); session.value.rounds.splice(index, 1); session.value.currentRoundId = session.value.rounds[Math.max(0, index - 1)]?.id || session.value.rounds[0].id }
+    if (hasContent) { try { await ElMessageBox.confirm(`「${item.label}」已有记录，确定删除？`, '删除轮次', {type: 'warning'}); remove() } catch { /* 取消 */ } } else remove()
+  }
+  const makeVote = (groups, abstainers, exiled) => { const text = makeVoteText(groups, abstainers, exiled); if (text) currentRound.value.publicEvents = [currentRound.value.publicEvents.trim(), text].filter(Boolean).join('\n'); showVote.value = false }
+  // 身份切换复核：三选项（保留并自行检查 / 清空轮次非公开信息 / 取消修改）
+  const roleReviewVisible = ref(false)
+  const roleReviewState = ref(null) // {prevRole, prevCamp, prevPrivate, nextRole, privateRoundCount}
+  const updateRole = async role => {
+    // 先记下旧状态，供"取消修改"回滚；再应用新身份（含阵营推断）
+    const prevRole = session.value.game.myRole
+    const prevCamp = session.value.game.myCamp
+    const prevPrivate = session.value.game.private
+    const count = privateNoteRoundCount(session.value)
+    session.value.game.myRole = role
+    const camp = inferCamp(role)
+    if (camp) session.value.game.myCamp = camp
+    const nextType = privateTypeForRole(role)
+    const privateChanged = !session.value.game.private || session.value.game.private.type !== nextType
+    if (count > 0) {
+      // 有轮次非公开信息 → 弹出三选项复核，不直接清空也不直接提交
+      roleReviewState.value = {prevRole, prevCamp, prevPrivate, nextRole: role, nextType, privateChanged, privateRoundCount: count}
+      roleReviewVisible.value = true
+      return
     }
-
-    // 快捷短语选项
-    const options = computed(() => selectedMode.value?.phrases || [])
-
-    // 版型简述
-    const modeDesc = computed(() => {
-        if (!selectedMode.value || !selectedMode.value.roles) return ''
-        return selectedMode.value.roles.map(r => r.count > 1 ? r.count + r.text : r.text).join('·')
-    })
-
-    // 从 localStorage 加载数据
-    onMounted(() => {
-        const savedRemarks = localStorage.getItem('remarks')
-        if (savedRemarks) {
-            remarks.value = savedRemarks
-        }
-
-        const savedChatRecords = localStorage.getItem('chatRecords')
-        if (savedChatRecords) {
-            Object.assign(chatRecords.value, JSON.parse(savedChatRecords))
-        }
-
-        window.addEventListener('resize', handleResize)
-    })
-
-    onUnmounted(() => {
-        window.removeEventListener('resize', handleResize)
-    })
-
-    // 自动保存到 localStorage
-    watch(remarks, (newValue) => {
-        localStorage.setItem('remarks', newValue)
-    }, {deep: true})
-
-    watch(chatRecords, (newValue) => {
-        localStorage.setItem('chatRecords', JSON.stringify(newValue))
-    }, {deep: true})
-
-    // 处理失焦修剪（修复：key 为 null 时不再报错）
-    const handleBlur = (key) => {
-        if (key && chatRecords.value[key]) {
-            chatRecords.value[key].message = chatRecords.value[key].message.trim()
-        }
-        remarks.value = remarks.value.trim()
+    applyPrivateReset(nextType, privateChanged)
+  }
+  // 身份已应用、结构化私有数据重置 + 提示词同步（不含轮次非公开信息的清理决策）
+  const applyPrivateReset = (nextType, privateChanged) => {
+    if (privateChanged) {
+      const hadNotes = session.value.game.privateNotes?.trim()
+      session.value.game.private = defaultPrivate(nextType)
+      if (hadNotes) ElMessage.info('已保留"跨身份通用补充"说明，将用于新身份的提示词')
     }
-
-    // 角色更新
-    const updatePlayerRole = (playerKey, newRole) => {
-        chatRecords.value[playerKey].sign = newRole
+    syncPrivateInfo(session.value.game)
+  }
+  const roleReviewKeep = () => { roleReviewVisible.value = false; roleReviewState.value = null; ElMessage.info('已保留轮次非公开信息，请自行检查是否适合新身份') }
+  const roleReviewClear = () => {
+    clearRoundPrivateNotes(session.value)
+    roleReviewVisible.value = false; roleReviewState.value = null
+    ElMessage.info('已清空所有轮次的非公开信息')
+  }
+  const roleReviewCancel = () => {
+    const state = roleReviewState.value
+    if (state) {
+      session.value.game.myRole = state.prevRole
+      session.value.game.myCamp = state.prevCamp
+      session.value.game.private = state.prevPrivate
+      syncPrivateInfo(session.value.game)
+      ElMessage.info('已取消身份修改')
     }
-
-    // 上警状态图标
-    function getElectionImage(election) {
-        switch (election) {
-            case 1: return handUpImage
-            case 2: return handDownImage
-            case 3: return handOffImage
-            default: return handOffImage
-        }
-    }
-
-    function getElectionAlt(election) {
-        switch (election) {
-            case 1: return '警上刚手'
-            case 2: return '警上放手'
-            case 3: return '警下'
-            default: return '警下'
-        }
-    }
-
-    function toggleElection(player) {
-        player.election = (player.election % 3) + 1
-    }
-
-    // 重置自记信息
-    const resetRemarks = () => {
-        ElMessageBox.confirm('确定要重置自记信息吗？', '重置自记信息', {
-            confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning', center: true,
-        }).then(() => {
-            remarks.value = ''
-            ElMessage({type: 'success', message: '自记信息已重置', duration: 500})
-        }).catch(() => {
-            ElMessage({type: 'info', message: '已取消重置', duration: 500})
-        })
-    }
-
-    // 重置发言信息
-    const resetTalks = () => {
-        ElMessageBox.confirm('确定要重置所有玩家的发言内容吗？', '重置发言信息', {
-            confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning', center: true,
-        }).then(() => {
-            Object.keys(chatRecords.value).forEach(key => {
-                chatRecords.value[key].message = ''
-                chatRecords.value[key].sign = ''
-                chatRecords.value[key].election = 3
-            })
-            ElMessage({type: 'success', message: '所有发言信息已重置', duration: 500})
-        }).catch(() => {
-            ElMessage({type: 'info', message: '已取消重置', duration: 500})
-        })
-    }
-
-    // 一键上警
-    const handUp = () => {
-        ElMessageBox.confirm('确定要使所有玩家更新为上警举手状态吗？', '一键上警', {
-            confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning', center: true,
-        }).then(() => {
-            Object.keys(chatRecords.value).forEach(key => {
-                chatRecords.value[key].election = 1
-            })
-            ElMessage({type: 'success', message: '所有玩家已上警', duration: 500})
-        }).catch(() => {
-            ElMessage({type: 'info', message: '已取消更新', duration: 500})
-        })
-    }
-
-    // 导出笔记信息
-    const exportInfo = () => {
-        let info = `版型：${selectedMode.value ? selectedMode.value.name : '未选择'}\n`
-        info += `♫♪♫♪♫♪♫♪♫♪♫♪♫♪\n`
-        info += `自记信息：\n${remarks.value.trim()}\n`
-        info += `♫♪♫♪♫♪♫♪♫♪♫♪♫♪\n`
-
-        const upPlayers = Object.entries(chatRecords.value)
-            .filter(([_, record]) => record.election === 1 || record.election === 2)
-            .map(([key]) => key.slice(-2))
-
-        const downPlayers = Object.entries(chatRecords.value)
-            .filter(([_, record]) => record.election === 3)
-            .map(([key]) => key.slice(-2))
-
-        if (upPlayers.length > 0) {
-            if (upPlayers.length === 12) {
-                info += `（全员上警）\n`
-            } else {
-                info += `警上：[${upPlayers.join(',')}]\n`
-                info += `警下：[${downPlayers.join(',')}]\n`
-            }
-            info += `♫♪♫♪♫♪♫♪♫♪♫♪♫♪\n`
-        }
-
-        info += `发言信息：\n`
-        const allDown = downPlayers.length === 12
-
-        Object.entries(chatRecords.value).forEach(([key, record]) => {
-            const playerNumber = key.slice(-2)
-            let electionSymbol = ''
-            if (!allDown) {
-                electionSymbol = (record.election === 1 || record.election === 2) ? '*' : '_'
-            }
-            const messageLines = record.message.split('\n')
-            if (messageLines.length > 0) {
-                info += `[${playerNumber}]${electionSymbol} ${messageLines[0]}\n`
-                for (let i = 1; i < messageLines.length; i++) {
-                    info += `   \t ${messageLines[i]}\n`
-                }
-            }
-        })
-
-        exportedInfo.value = info.trim()
-        showExportDialog.value = true
-    }
-
-    // 复制导出信息
-    const copyExportedInfo = () => {
-        navigator.clipboard.writeText(exportedInfo.value).then(() => {
-            ElMessage({message: '信息已复制到剪贴板', type: 'success', duration: 2000})
-            showExportDialog.value = false
-        }).catch(() => {
-            ElMessage({message: '复制失败，请手动复制', type: 'error', duration: 2000})
-        })
-    }
-
-    // 设置对话框
-    const openSettings = () => {
-        showGameSettings.value = true
-    }
-
-    const handleSettingsClose = (done) => {
-        if (gameSettingsRef.value) {
-            gameSettingsRef.value.handleClose((shouldClose) => {
-                if (shouldClose) {
-                    showSettings.value = false
-                    done()
-                }
-            })
-        } else {
-            done()
-        }
-    }
-
-    const updateConfig = (newConfig) => {
-        store.updateGameModes(newConfig)
-    }
-
-    return {
-        store, selectedMode, remarks, chatRecords,
-        showExportDialog, exportedInfo, showGameSettings,
-        showSettings, gameSettingsRef, dialogWidth, options, modeDesc,
-        handleBlur, getElectionImage, getElectionAlt, toggleElection,
-        resetRemarks, resetTalks, handUp, exportInfo, copyExportedInfo,
-        handleSettingsClose, openSettings, updatePlayerRole, updateConfig
-    }
+    roleReviewVisible.value = false; roleReviewState.value = null
+  }
+  const copyPrompt = async () => { try { await navigator.clipboard.writeText(prompt.value); ElMessage.success('提示词已复制') } catch { ElMessage.error('复制失败，请手动复制') } }
+  const resetGame = () => ElMessageBox.confirm('清空本局所有记录？此操作不可恢复。', '二次确认', {type: 'error'}).then(() => { session.value = createSession(); session.value.game.modeId = selectedMode.value?.id || null }).catch(() => {})
+  return {session, selectedMode, modeDesc, currentRound, showSettings, showPrompt, showVote, showPrivate, showGameSettings, gameSettingsRef, gateBlocked, promptOptions, prompt, getSpeech, updateSpeech, toggleFlag, insertTemplate, setPlayerStatus, insertPublic, nextRound, prevRound, nextLabel, isLastRound, addCustomRound, renameCurrentRound, deleteRound, makeVote, updateRole, roleReviewVisible, roleReviewState, roleReviewKeep, roleReviewClear, roleReviewCancel, copyPrompt, resetGame, openSettings: () => { showGameSettings.value = true }, handleSettingsClose: done => done()}
 }

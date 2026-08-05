@@ -1,5 +1,9 @@
 # 🐺 狼人杀在线笔记
 
+> 本项目基于 [syhy0612/lrsNotes](https://github.com/syhy0612/lrsNotes) 改造，保留原项目 MIT License 与版权声明。
+
+当前版本是发言优先的多轮记录台：按轮次保存 12 席原始发言，补充少量公共事件、私有信息和整体备注，并可生成 AI 策略提示词。提供未发言、滑水、无遗言标记、可编辑的身份/事件模板和可选票型文本助手；不模拟规则，也不调用 AI API。所有数据默认仅保存在浏览器本地，用户自行复制提示词到第三方 AI。
+
 狼人杀在线笔记是一个为狼人杀游戏玩家设计的工具，方便玩家记录发言信息并导出，提高游戏体验。
 <p align="center">
     <a href="https://lrsnotes.pages.dev"><img src="https://img.shields.io/badge/访问-在线使用-lgreen?style=plastic" alt="在线使用"></a>
