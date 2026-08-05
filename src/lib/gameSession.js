@@ -71,6 +71,8 @@ export function createRound(meta = {}) {
         label: meta.label || '第一夜',
         publicEvents: meta.publicEvents ?? '',
         privateNotes: meta.privateNotes ?? '',
+        // 身份切换后保留的旧非公开信息标记：true 表示尚待用户复核，提示词中单独分段，不当作确定事实
+        privateNotesNeedsReview: Boolean(meta.privateNotesNeedsReview),
         speeches: meta.speeches ?? {}
     }
 }
@@ -123,8 +125,24 @@ export function clearRoundPrivateNotes(session = {}) {
     let cleared = 0
     for (const round of session.rounds || []) {
         if (round.privateNotes?.trim()) { round.privateNotes = ''; cleared++ }
+        round.privateNotesNeedsReview = false
     }
     return cleared
+}
+
+// 身份切换选"保留并自行检查"：给所有含非公开信息的轮次标记待复核，提示词中将单独分段
+export function markRoundPrivateNotesForReview(session = {}) {
+    let marked = 0
+    for (const round of session.rounds || []) {
+        if (round.privateNotes?.trim()) { round.privateNotesNeedsReview = true; marked++ }
+    }
+    return marked
+}
+
+// 用户确认某轮非公开信息仍然有效（或编辑该轮非公开信息后）：清除该轮待复核标记
+export function confirmRoundPrivateNotes(round = {}) {
+    round.privateNotesNeedsReview = false
+    return round
 }
 
 // 应用初始化时的页面恒为首页；会话是否存在都不影响初始页面（页面与数据分离）。
@@ -296,6 +314,7 @@ export function normalizeSession(session = {}) {
   }
   for (const item of session.rounds) {
     if (typeof item.privateNotes !== 'string') item.privateNotes = ''
+    if (typeof item.privateNotesNeedsReview !== 'boolean') item.privateNotesNeedsReview = false
     // 轮次结构迁移：标准昼夜标签→dayNumber/period；未知标签→自定义轮次
     if (!('period' in item) || !('isCustom' in item)) {
       const recognized = standardRoundMeta(item.label)
@@ -356,12 +375,13 @@ export function buildStrategyPrompt(session, options = {}) {
   const header = `你是狼人杀策略助手。以最大化当前用户阵营胜率为目标，给出合法、可执行的下一步策略；不要使用场外信息或假设非法私聊。\n\n【我的信息】\n版型：${gameMode?.name || '未选择'}\n座位：${session.game?.mySeat ? pad(session.game.mySeat) : '未设置'}\n真实身份：${aliasRole(session.game?.myRole) || '未设置'}\n阵营：${session.game?.myCamp || '未设置'}\n【用户私有信息】\n${privateText}\n\n`
 
   // 单个轮次的子段落：玩家发言 → 公共信息 → 非公开信息（没有内容的子段落直接省略）
+  // 待复核（privateNotesNeedsReview）的非公开信息不放入此段，由主流程单独收集输出
   const recordBlock = (round, compact = false) => {
     const parts = []
     const speeches = speechBlock(round, compact)
     if (speeches.trim()) parts.push(`【玩家发言】\n${speeches}`)
     if (round.publicEvents?.trim()) parts.push(`【公共信息】\n${round.publicEvents.trim()}\n`)
-    if (round.privateNotes?.trim()) parts.push(`【用户掌握的非公开信息】\n以下信息只有用户或用户阵营掌握，其他玩家未必知道。AI 在制定策略时可以使用，但不能假设其他玩家也知道，也不得建议用户无理由公开自己的隐藏身份或秘密信息。\n${round.privateNotes.trim()}\n`)
+    if (round.privateNotes?.trim() && !round.privateNotesNeedsReview) parts.push(`【用户掌握的非公开信息】\n以下信息只有用户或用户阵营掌握，其他玩家未必知道。AI 在制定策略时可以使用，但不能假设其他玩家也知道，也不得建议用户无理由公开自己的隐藏身份或秘密信息。\n${round.privateNotes.trim()}\n`)
     return parts.join('')
   }
   // 轮次时间线：第一夜 → 第一天 → 第二夜 → …，当前轮不单独前置、不重复
@@ -371,28 +391,38 @@ export function buildStrategyPrompt(session, options = {}) {
   }).filter(Boolean).join('\n')
   const gameRecords = roundRecords ? `【对局记录】\n${roundRecords}\n` : ''
 
+  // 身份切换后保留、尚待复核的非公开信息：单独分段，不当作当前身份确定掌握的信息
+  const reviewableNotes = rounds
+    .filter(item => item.privateNotes?.trim() && item.privateNotesNeedsReview)
+    .map(item => `【${item.label}】\n${item.privateNotes.trim()}`)
+    .join('\n')
+  const reviewableSection = reviewableNotes
+    ? `【身份切换后保留、尚待复核的非公开信息】\n以下内容可能来自用户原身份，不得直接视为当前身份确定掌握的信息。\n${reviewableNotes}\n`
+    : ''
+
   // 主观备注（所有轮次之后）
   const notesText = session.overallNotes?.trim() ? `【用户的主观备注】\n以下是用户自己的判断、怀疑或计划，可能存在误判，不得直接当作事实。\n${session.overallNotes.trim()}\n` : ''
 
   const goal = session.game?.myCamp === '狼人' ? '提高狼队胜率；重点分析狼队暴露风险、票型解释、下一轮发言与夜间目标。' : session.game?.myCamp === '第三方' ? '围绕该身份的胜利条件给出生存、发言和投票策略；规则不明时明确不确定性。' : '重点找出狼人，给出可信玩家、关键问题、投票建议和适合当前身份的短发言稿。'
   const task = `【任务】\n${goal}\n不要把玩家自称当作事实；不要盲从用户评价；不要编造未记录的发言或事件；不得假设其他玩家知道用户掌握的非公开信息（如狼队刀口、查验结果、用药等），也不得建议用户无理由公开自己的隐藏身份或秘密信息。请依次给出：局势摘要、关键公共事实、身份倾向及理由、两到三种可能世界、主要风险、下一步行动、投票或技能建议、发言重点、简短发言稿、备用方案、缺失信息。`
 
-  const required = `${header}${gameRecords}${notesText}`
+  const required = `${header}${gameRecords}${reviewableSection}${notesText}`
   // compactEarlierRounds：非当前轮发言截短；maxCharacters：超限时保留结构、压缩早期轮次内容
+  // 注意：待复核段（reviewableSection）保持完整不压缩，因其为关键待确认信息
   let body = required
   if (compactEarlierRounds && current) {
     const compacted = rounds.map(item => {
       const bodyText = item.id === currentId ? recordBlock(item, false) : recordBlock(item, true)
       return bodyText.trim() ? `【${item.label}】\n${bodyText}` : ''
     }).filter(Boolean).join('\n')
-    body = `${header}${compacted ? `【对局记录】\n${compacted}\n` : ''}${notesText}`
+    body = `${header}${compacted ? `【对局记录】\n${compacted}\n` : ''}${reviewableSection}${notesText}`
   } else if (maxCharacters && body.length + task.length > maxCharacters && current) {
     // 压缩早期轮次（当前轮保持完整），并在记录末尾标注
     const compacted = rounds.map(item => {
       const bodyText = item.id === currentId ? recordBlock(item, false) : recordBlock(item, true)
       return bodyText.trim() ? `【${item.label}】\n${bodyText}` : ''
     }).filter(Boolean).join('\n')
-    body = `${header}${compacted ? `【对局记录】\n${compacted}\n【较早发言已压缩】\n` : ''}${notesText}`
+    body = `${header}${compacted ? `【对局记录】\n${compacted}\n【较早发言已压缩】\n` : ''}${reviewableSection}${notesText}`
   }
 
   const prompt = `${body}${task}`

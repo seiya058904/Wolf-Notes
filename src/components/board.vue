@@ -39,11 +39,11 @@
       </el-dropdown>
     </section>
 
-    <section class="workspace">
+    <section class="workspace" :class="{ 'workspace-night-collapsed': currentRound.period === 'night' && !openSections.speeches }">
       <!-- 夜间模式默认隐藏发言区 -->
       <div v-if="currentRound.period === 'day'" class="speeches-panel"><div class="section-title"><div><span>本轮发言</span><small>原话优先，模板会直接插入发言框</small></div><el-select v-model="templateTarget" size="small" placeholder="模板目标"><el-option v-for="seat in 12" :key="seat" :label="`${seat}号`" :value="seat"/></el-select></div><div class="players-grid"><PlayerCard v-for="seat in 12" :key="seat" :seat="seat" :player="session.players[seat]" :speech="getSpeech(seat)" @update:text="value => updateSpeech(seat, value)" @toggle:flag="flag => toggleFlag(seat, flag)" @insert:template="type => insertTemplate(seat, type, templateTarget)" @update:life="value => setPlayerStatus(seat, 'lifeStatus', value)" @update:election="value => setPlayerStatus(seat, 'electionStatus', value)"/></div></div>
       <div v-else class="speeches-panel collapsed">
-        <button type="button" class="show-speeches" @click="openSections.speeches = true">显示玩家备注</button>
+        <button type="button" class="show-speeches" :aria-expanded="openSections.speeches ? 'true' : 'false'" @click="toggleSection('speeches')">{{ openSections.speeches ? '收起玩家备注' : '显示玩家备注' }}</button>
         <div v-if="openSections.speeches" class="players-grid">
           <PlayerCard v-for="seat in 12" :key="seat" :seat="seat" :player="session.players[seat]" :speech="getSpeech(seat)" @update:text="value => updateSpeech(seat, value)" @toggle:flag="flag => toggleFlag(seat, flag)" @insert:template="type => insertTemplate(seat, type, templateTarget)" @update:life="value => setPlayerStatus(seat, 'lifeStatus', value)" @update:election="value => setPlayerStatus(seat, 'electionStatus', value)"/>
         </div>
@@ -55,7 +55,11 @@
             <span>本轮非公开信息</span><small>仅供你和 AI 分析使用，其他玩家未必知道</small><em class="badge">{{ privateBadge }}</em>
           </button>
           <div v-show="openSections.private" class="collapse-body">
-            <el-input v-model="currentRound.privateNotes" type="textarea" :rows="5" placeholder="例如：第一夜狼队最终刀11号。"/>
+            <div v-if="currentRound.privateNotesNeedsReview" class="review-banner">
+              <span>该轮非公开信息来自身份切换前，尚未确认是否仍然有效。编辑即视为已复核，或点击右侧按钮确认。</span>
+              <button type="button" class="confirm-review" @click="confirmCurrentRoundPrivateNotes">确认内容仍然有效</button>
+            </div>
+            <el-input :model-value="currentRound.privateNotes" @update:model-value="onPrivateNotesInput" type="textarea" :rows="5" placeholder="例如：第一夜狼队最终刀11号。"/>
           </div>
         </section>
         <section v-if="currentRound.period === 'day'" class="notes-section">
@@ -81,7 +85,11 @@
             <span>本轮非公开信息</span><small>仅供你和 AI 分析使用，其他玩家未必知道</small><em class="badge">{{ privateBadge }}</em>
           </button>
           <div v-show="openSections.private" class="collapse-body">
-            <el-input v-model="currentRound.privateNotes" type="textarea" :rows="5" placeholder="例如：第一夜狼队最终刀11号。"/>
+            <div v-if="currentRound.privateNotesNeedsReview" class="review-banner">
+              <span>该轮非公开信息来自身份切换前，尚未确认是否仍然有效。编辑即视为已复核，或点击右侧按钮确认。</span>
+              <button type="button" class="confirm-review" @click="confirmCurrentRoundPrivateNotes">确认内容仍然有效</button>
+            </div>
+            <el-input :model-value="currentRound.privateNotes" @update:model-value="onPrivateNotesInput" type="textarea" :rows="5" placeholder="例如：第一夜狼队最终刀11号。"/>
           </div>
         </section>
         <section class="notes-section">
@@ -97,7 +105,7 @@
     </section>
 
     <el-dialog v-model="showSettings" title="我的信息" width="540px"><div class="settings-form"><div class="setting-row"><label>我的座位</label><el-select v-model="session.game.mySeat" placeholder="选择座位"><el-option v-for="n in 12" :key="n" :label="`${n}号`" :value="n"/></el-select></div><div class="setting-row"><label>真实身份</label><el-select :model-value="session.game.myRole" filterable allow-create placeholder="真实身份" @update:model-value="updateRole"><el-option v-for="(role, index) in availableRoles" :key="index" :label="role" :value="role"/></el-select></div><div class="setting-row"><label>阵营</label><el-select v-model="session.game.myCamp" placeholder="阵营（身份未知时选择）"><el-option label="好人" value="好人"/><el-option label="狼人" value="狼人"/><el-option label="第三方" value="第三方"/></el-select></div><div class="setting-row"><label>私有信息</label><PrivateInfoForm v-if="session.game.private" v-model:value="session.game.private" :seat="session.game.mySeat"/></div><div class="setting-row"><label>跨身份通用补充</label><el-input v-model="session.game.privateNotes" type="textarea" :rows="3" placeholder="切换身份后仍会保留并交给 AI，请勿填写身份专属信息"/></div></div></el-dialog>
-    <el-dialog v-model="roleReviewVisible" title="身份切换复核" width="520px"><template v-if="roleReviewState"><p class="role-review-text">身份已从 <strong>{{ roleReviewState.prevRole || '未设置' }}</strong> 修改为 <strong>{{ roleReviewState.nextRole }}</strong>。</p><p class="role-review-text">当前有 <strong>{{ roleReviewState.privateRoundCount }}</strong> 个轮次包含非公开信息，其中可能存在仅原身份能够知道的内容（例如狼队刀口、查验结果、用药等）。</p></template><template #footer><el-button @click="roleReviewCancel">取消修改</el-button><el-button type="warning" @click="roleReviewClear">清空轮次非公开信息</el-button><el-button type="primary" @click="roleReviewKeep">保留并自行检查</el-button></template></el-dialog>
+    <el-dialog v-model="roleReviewVisible" title="身份切换复核" width="520px"><template v-if="roleReviewState"><p class="role-review-text">身份已从 <strong>{{ aliasRole(roleReviewState.prevRole) || '未设置' }}</strong> 修改为 <strong>{{ aliasRole(roleReviewState.nextRole) }}</strong>。</p><p class="role-review-text">当前有 <strong>{{ roleReviewState.privateRoundCount }}</strong> 个轮次包含非公开信息，其中可能存在仅原身份能够知道的内容（例如狼队刀口、查验结果、用药等）。</p><p class="role-review-hint">选择"保留并自行检查"后，这些信息将被标记为<strong>待复核</strong>，提示词中单独分段，不会被当作当前身份确定掌握的信息。请在记录台逐轮确认或编辑后再交给 AI。</p></template><template #footer><el-button @click="roleReviewCancel">取消修改</el-button><el-button type="warning" @click="roleReviewClear">清空轮次非公开信息</el-button><el-button type="primary" @click="roleReviewKeep">保留并自行检查</el-button></template></el-dialog>
     <el-dialog v-model="showVote" title="票型助手（可选）" width="560px"><p class="tip">生成后仍是一段可编辑的公共事件文本。</p><div v-for="(group, index) in voteGroups" :key="index" class="vote-row"><el-select v-model="group.target" placeholder="被投玩家"><el-option v-for="seat in 12" :key="seat" :label="`${seat}号`" :value="seat"/></el-select><el-select v-model="group.voters" multiple placeholder="投票玩家"><el-option v-for="seat in 12" :key="seat" :label="`${seat}号`" :value="seat"/></el-select><button type="button" @click="voteGroups.splice(index, 1)">移除</button></div><button type="button" @click="voteGroups.push({target: null, voters: []})">新增目标</button><div class="vote-row"><el-select v-model="abstainers" multiple placeholder="弃票玩家"><el-option v-for="seat in 12" :key="seat" :label="`${seat}号`" :value="seat"/></el-select><el-select v-model="exiled" placeholder="最终放逐"><el-option v-for="seat in 12" :key="seat" :label="`${seat}号`" :value="seat"/></el-select></div><template #footer><el-button @click="showVote = false">取消</el-button><el-button type="primary" @click="submitVote">生成票型文本</el-button></template></el-dialog>
     <el-dialog v-model="showPrompt" title="AI 策略提示词" width="760px"><div class="prompt-options"><el-checkbox v-model="promptOptions.compactEarlierRounds">紧凑早期轮次</el-checkbox><el-input-number v-model="promptOptions.maxCharacters" :min="1" placeholder="字符上限（可选）" controls-position="right"/></div><el-input :model-value="prompt" type="textarea" :rows="22" readonly/><template #footer><el-button @click="showPrompt = false">关闭</el-button><el-button type="primary" @click="copyPrompt">复制提示词</el-button></template></el-dialog>
     <el-dialog v-model="showGameSettings" title="版型设置" width="520px"><GameSettings ref="gameSettingsRef"/></el-dialog>
@@ -113,7 +121,7 @@ import GameSettings from './gameSettings.vue'
 import PrivateInfoForm from './privateInfoForm.vue'
 import {aliasRole, defaultPrivate, privateTypeForRole} from '@/lib/gameSession'
 const emit = defineEmits(['go-home', 'missing-setup'])
-const {session, selectedMode, modeDesc, currentRound, showSettings, showPrompt, showVote, showGameSettings, gameSettingsRef, gateBlocked, promptOptions, prompt, getSpeech, updateSpeech, toggleFlag, insertTemplate, setPlayerStatus, insertPublic, nextRound, prevRound, nextLabel, isLastRound, addCustomRound, renameCurrentRound, deleteRound, makeVote, updateRole, roleReviewVisible, roleReviewState, roleReviewKeep, roleReviewClear, roleReviewCancel, copyPrompt, resetGame, openSettings} = useBoard()
+const {session, selectedMode, modeDesc, currentRound, showSettings, showPrompt, showVote, showGameSettings, gameSettingsRef, gateBlocked, promptOptions, prompt, getSpeech, updateSpeech, toggleFlag, insertTemplate, setPlayerStatus, insertPublic, nextRound, prevRound, nextLabel, isLastRound, addCustomRound, renameCurrentRound, deleteRound, makeVote, updateRole, roleReviewVisible, roleReviewState, roleReviewKeep, roleReviewClear, roleReviewCancel, confirmCurrentRoundPrivateNotes, onPrivateNotesInput, copyPrompt, resetGame, openSettings} = useBoard()
 const templateTarget = ref(null), voteGroups = ref([{target: null, voters: []}]), abstainers = ref([]), exiled = ref(null)
 // 移动端三输入区默认收起（桌面默认展开）
 const openSections = ref({public: true, private: true, notes: true, speeches: false})
@@ -189,6 +197,56 @@ watch(showSettings, open => {
 
 .collapsed .players-grid {
   margin-top: 12px;
+}
+
+/* 夜晚且玩家备注折叠时：信息区扩展为全宽，消除左侧空白 */
+.workspace-night-collapsed {
+  grid-template-columns: 1fr;
+}
+
+/* 待复核提示横幅 */
+.review-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.review-banner span {
+  flex: 1;
+  min-width: 200px;
+  line-height: 1.5;
+}
+.confirm-review {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: white;
+  border-radius: 7px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.confirm-review:hover {
+  opacity: 0.9;
+}
+
+/* 复核弹窗提示文案 */
+.role-review-hint {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 8px 0 0;
+}
+.role-review-hint strong {
+  color: var(--text-primary);
 }
 @media(max-width:720px){.board{padding:10px 8px}.topbar{align-items:center;flex-wrap:wrap;gap:6px}.mode{font-size:15px;order:0}.top-actions{width:100%;justify-content:space-between;margin-left:0}.top-actions .primary{flex:1}.full-label{display:none}.short-label{display:inline}.home,.theme{padding:6px 9px}.workspace{grid-template-columns:1fr}.players-grid{grid-template-columns:1fr}.round-tools .el-input{max-width:none;flex:1}.section-title .el-select{width:110px}.prompt-options{align-items:flex-start;flex-direction:column}}
 </style>

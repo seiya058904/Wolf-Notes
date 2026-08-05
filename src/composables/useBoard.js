@@ -2,7 +2,7 @@ import {computed, onMounted, ref, watch} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {useGameModeStore} from '@/stores/gameModeStore'
 import {storeToRefs} from 'pinia'
-import {buildStrategyPrompt, clearRoundPrivateNotes, createRound, createSession, defaultPrivate, inferCamp, insertSpeechTemplate, isSessionReady, loadSession, makeVoteText, nextRoundMeta, privateNoteRoundCount, privateTypeForRole, resolveNextRound, saveSession, syncPrivateInfo} from '@/lib/gameSession'
+import {buildStrategyPrompt, clearRoundPrivateNotes, confirmRoundPrivateNotes, createRound, createSession, defaultPrivate, inferCamp, insertSpeechTemplate, isSessionReady, loadSession, makeVoteText, markRoundPrivateNotesForReview, nextRoundMeta, privateNoteRoundCount, privateTypeForRole, resolveNextRound, saveSession, syncPrivateInfo} from '@/lib/gameSession'
 
 const pad = seat => String(seat).padStart(2, '0')
 const speech = () => ({text: '', flags: {noSpeech: false, lowInformation: false, noLastWords: false}})
@@ -95,11 +95,30 @@ export function useBoard() {
     }
     syncPrivateInfo(session.value.game)
   }
-  const roleReviewKeep = () => { roleReviewVisible.value = false; roleReviewState.value = null; ElMessage.info('已保留轮次非公开信息，请自行检查是否适合新身份') }
+  const roleReviewKeep = () => {
+    // 保留旧身份的非公开信息，但标记为待复核：提示词中单独分段，不当作当前身份确定掌握的信息
+    markRoundPrivateNotesForReview(session.value)
+    roleReviewVisible.value = false; roleReviewState.value = null
+    ElMessage.info('已保留轮次非公开信息并标记为待复核，请在记录台逐轮确认或编辑')
+  }
   const roleReviewClear = () => {
     clearRoundPrivateNotes(session.value)
     roleReviewVisible.value = false; roleReviewState.value = null
     ElMessage.info('已清空所有轮次的非公开信息')
+  }
+  // 用户确认当前轮非公开信息仍然有效：清除待复核标记，提示词中恢复为普通非公开信息段
+  const confirmCurrentRoundPrivateNotes = () => {
+    if (currentRound.value?.privateNotesNeedsReview) {
+      confirmRoundPrivateNotes(currentRound.value)
+      ElMessage.success('已确认该轮非公开信息仍然有效')
+    }
+  }
+  // 用户编辑当前轮非公开信息时：视为已复核，清除待复核标记
+  const onPrivateNotesInput = value => {
+    if (currentRound.value) {
+      currentRound.value.privateNotes = value
+      if (currentRound.value.privateNotesNeedsReview) currentRound.value.privateNotesNeedsReview = false
+    }
   }
   const roleReviewCancel = () => {
     const state = roleReviewState.value
@@ -114,5 +133,5 @@ export function useBoard() {
   }
   const copyPrompt = async () => { try { await navigator.clipboard.writeText(prompt.value); ElMessage.success('提示词已复制') } catch { ElMessage.error('复制失败，请手动复制') } }
   const resetGame = () => ElMessageBox.confirm('清空本局所有记录？此操作不可恢复。', '二次确认', {type: 'error'}).then(() => { session.value = createSession(); session.value.game.modeId = selectedMode.value?.id || null }).catch(() => {})
-  return {session, selectedMode, modeDesc, currentRound, showSettings, showPrompt, showVote, showPrivate, showGameSettings, gameSettingsRef, gateBlocked, promptOptions, prompt, getSpeech, updateSpeech, toggleFlag, insertTemplate, setPlayerStatus, insertPublic, nextRound, prevRound, nextLabel, isLastRound, addCustomRound, renameCurrentRound, deleteRound, makeVote, updateRole, roleReviewVisible, roleReviewState, roleReviewKeep, roleReviewClear, roleReviewCancel, copyPrompt, resetGame, openSettings: () => { showGameSettings.value = true }, handleSettingsClose: done => done()}
+  return {session, selectedMode, modeDesc, currentRound, showSettings, showPrompt, showVote, showPrivate, showGameSettings, gameSettingsRef, gateBlocked, promptOptions, prompt, getSpeech, updateSpeech, toggleFlag, insertTemplate, setPlayerStatus, insertPublic, nextRound, prevRound, nextLabel, isLastRound, addCustomRound, renameCurrentRound, deleteRound, makeVote, updateRole, roleReviewVisible, roleReviewState, roleReviewKeep, roleReviewClear, roleReviewCancel, confirmCurrentRoundPrivateNotes, onPrivateNotesInput, copyPrompt, resetGame, openSettings: () => { showGameSettings.value = true }, handleSettingsClose: done => done()}
 }
