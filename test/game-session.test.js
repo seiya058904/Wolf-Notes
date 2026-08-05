@@ -1,6 +1,21 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {buildStrategyPrompt, createSession, insertSpeechTemplate, loadSession, migrateV2Session, makeVoteText} from '../src/lib/gameSession.js'
+import {buildStrategyPrompt, createSession, insertSpeechTemplate, loadSession, migrateV2Session, makeVoteText, normalizeSession} from '../src/lib/gameSession.js'
+
+test('preserves per-round raw transcript and includes it as uncertain speech material', () => {
+  const session = createSession()
+  session.rounds[0].rawTranscript = '系统播报：现在请8号发言。8号：我认为4号可疑。'
+  const prompt = buildStrategyPrompt(session)
+  assert.match(prompt, /【本轮原始语音转写】/)
+  assert.match(prompt, /系统播报：现在请8号发言。8号：我认为4号可疑。/)
+  assert.match(prompt, /可能包含播报和玩家原话/)
+  assert.match(prompt, /不能从原始转写自行补出未记录的死亡、技能、票型等事件/)
+})
+
+test('normalizes missing raw transcript fields in old sessions', () => {
+  const session = normalizeSession({schemaVersion: 3, game: {}, rounds: [{id: 'r1', label: '第一夜', speeches: {}}], currentRoundId: 'r1'})
+  assert.equal(session.rounds[0].rawTranscript, '')
+})
 
 test('migrates legacy records to v3 text rounds without deleting their content', () => {
   const values = {remarks: '旧备注', chatRecords: JSON.stringify({player01: {message: '我是预言家', election: 1}})}

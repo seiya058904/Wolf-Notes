@@ -93,6 +93,14 @@
           </div>
         </section>
         <section class="notes-section">
+          <button type="button" class="collapse-title" @click="toggleSection('transcript')">
+            <span>本轮原始转写</span><small>可粘贴整段语音识别，交给 AI 整理发言</small><em class="badge">{{ transcriptBadge }}</em>
+          </button>
+          <div v-show="openSections.transcript" class="collapse-body">
+            <el-input v-model="currentRound.rawTranscript" type="textarea" :rows="8" placeholder="粘贴本轮连续语音转写；可包含系统播报和玩家原话，AI 会结合上下文分析。"/>
+          </div>
+        </section>
+        <section class="notes-section">
           <button type="button" class="collapse-title" @click="toggleSection('notes')">
             <span>整体备注</span><small>不属于某一轮的补充判断</small><em class="badge">{{ notesBadge }}</em>
           </button>
@@ -124,15 +132,16 @@ const emit = defineEmits(['go-home', 'missing-setup'])
 const {session, selectedMode, modeDesc, currentRound, showSettings, showPrompt, showVote, showGameSettings, gameSettingsRef, gateBlocked, promptOptions, prompt, getSpeech, updateSpeech, toggleFlag, insertTemplate, setPlayerStatus, insertPublic, nextRound, prevRound, nextLabel, isLastRound, addCustomRound, renameCurrentRound, deleteRound, makeVote, updateRole, roleReviewVisible, roleReviewState, roleReviewKeep, roleReviewClear, roleReviewCancel, confirmCurrentRoundPrivateNotes, onPrivateNotesInput, copyPrompt, resetGame, openSettings} = useBoard()
 const templateTarget = ref(null), voteGroups = ref([{target: null, voters: []}]), abstainers = ref([]), exiled = ref(null)
 // 移动端三输入区默认收起（桌面默认展开）
-const openSections = ref({public: true, private: true, notes: true, speeches: false})
+const openSections = ref({public: true, private: true, notes: true, transcript: false, speeches: false})
 onMounted(() => {
-  if (window.matchMedia('(max-width: 720px)').matches) openSections.value = {public: false, private: false, notes: false}
+  if (window.matchMedia('(max-width: 720px)').matches) openSections.value = {public: false, private: false, notes: false, transcript: false, speeches: false}
 })
 const toggleSection = key => { openSections.value[key] = !openSections.value[key] }
 const countLines = text => (text || '').split('\n').filter(Boolean).length
 const publicBadge = computed(() => { const n = countLines(currentRound.value?.publicEvents); return n ? `已记录 ${n} 项` : '未记录' })
 const privateBadge = computed(() => { const n = countLines(currentRound.value?.privateNotes); return n ? `已记录 ${n} 项` : '未记录' })
 const notesBadge = computed(() => countLines(session.value.overallNotes) ? '已记录' : '未记录')
+const transcriptBadge = computed(() => currentRound.value?.rawTranscript?.trim() ? `${currentRound.value.rawTranscript.trim().length}字` : '未记录')
 const eventTemplates = [{key: 'death', label: '死亡'}, {key: 'exile', label: '放逐'}, {key: 'selfDestruct', label: '自爆'}, {key: 'sheriff', label: '警长'}, {key: 'withdrawn', label: '退水'}, {key: 'vote', label: '票型'}]
 // 身份选项：版型角色显示全称（存储全称，与阵营映射/私有信息类型兼容）
 const availableRoles = computed(() => selectedMode.value?.roles?.map(role => aliasRole(role.text)) || [])

@@ -71,6 +71,7 @@ export function createRound(meta = {}) {
         label: meta.label || '第一夜',
         publicEvents: meta.publicEvents ?? '',
         privateNotes: meta.privateNotes ?? '',
+        rawTranscript: meta.rawTranscript ?? '',
         // 身份切换后保留的旧非公开信息标记：true 表示尚待用户复核，提示词中单独分段，不当作确定事实
         privateNotesNeedsReview: Boolean(meta.privateNotesNeedsReview),
         speeches: meta.speeches ?? {}
@@ -272,7 +273,7 @@ export function migrateV2Session(old = {}) {
   const oldRounds = Array.isArray(old.rounds) && old.rounds.length ? [...old.rounds].sort((a, b) => (a.sequence || 0) - (b.sequence || 0)) : [createRound({id: 'round-1'})]
   session.rounds = oldRounds.map((oldRound, index) => {
     const recognized = standardRoundMeta(oldRound.label || '')
-    return {id: oldRound.id || `round-${index + 1}`, dayNumber: recognized?.dayNumber ?? null, period: recognized?.period || 'custom', isCustom: !recognized, label: oldRound.label || `第${index + 1}轮`, publicEvents: '', privateNotes: '', speeches: Object.fromEntries(Object.entries(oldRound.speeches || {}).map(([seat, value]) => [seat, {text: typeof value === 'string' ? value : value.text || '', flags: {noSpeech: Boolean(value?.tags?.includes('no-speech')), lowInformation: Boolean(value?.tags?.includes('coasting')), noLastWords: Boolean(value?.tags?.includes('no-last-words'))}}]))}
+    return {id: oldRound.id || `round-${index + 1}`, dayNumber: recognized?.dayNumber ?? null, period: recognized?.period || 'custom', isCustom: !recognized, label: oldRound.label || `第${index + 1}轮`, publicEvents: '', privateNotes: '', rawTranscript: '', speeches: Object.fromEntries(Object.entries(oldRound.speeches || {}).map(([seat, value]) => [seat, {text: typeof value === 'string' ? value : value.text || '', flags: {noSpeech: Boolean(value?.tags?.includes('no-speech')), lowInformation: Boolean(value?.tags?.includes('coasting')), noLastWords: Boolean(value?.tags?.includes('no-last-words'))}}]))}
   })
   session.currentRoundId = old.currentRoundId && session.rounds.some(item => item.id === old.currentRoundId) ? old.currentRoundId : session.rounds[0].id
   for (const [seat, player] of Object.entries(old.players || {})) {
@@ -319,6 +320,7 @@ export function normalizeSession(session = {}) {
   }
   for (const item of session.rounds) {
     if (typeof item.privateNotes !== 'string') item.privateNotes = ''
+    if (typeof item.rawTranscript !== 'string') item.rawTranscript = ''
     if (typeof item.privateNotesNeedsReview !== 'boolean') item.privateNotesNeedsReview = false
     // 轮次结构迁移：标准昼夜标签→dayNumber/period；未知标签→自定义轮次
     if (!('period' in item) || !('isCustom' in item)) {
@@ -387,6 +389,7 @@ export function buildStrategyPrompt(session, options = {}) {
     if (speeches.trim()) parts.push(`【玩家发言】\n${speeches}`)
     if (round.publicEvents?.trim()) parts.push(`【公共信息】\n${round.publicEvents.trim()}\n`)
     if (round.privateNotes?.trim() && !round.privateNotesNeedsReview) parts.push(`【用户掌握的非公开信息】\n以下信息只有用户或用户阵营掌握，其他玩家未必知道。AI 在制定策略时可以使用，但不能假设其他玩家也知道，也不得建议用户无理由公开自己的隐藏身份或秘密信息。\n${round.privateNotes.trim()}\n`)
+    if (round.rawTranscript?.trim()) parts.push(`【本轮原始语音转写】\n以下是连续语音识别得到的未经分类材料，可能包含播报和玩家原话。请结合播报判断发言人、阶段和轮次，并把不确定的漏识别或错分配标出来；不能从原始转写自行补出未记录的死亡、技能、票型等事件。\n${round.rawTranscript.trim()}\n`)
     return parts.join('')
   }
   // 轮次时间线：第一夜 → 第一天 → 第二夜 → …，当前轮不单独前置、不重复
