@@ -2,16 +2,20 @@
 
 ## Project
 
-Wolf-Notes is a Vue 3 + Vite狼人杀记录台. The main entry is `src/main.js`; `src/App.vue` selects the home, setup, and record views. Session state, migrations, round flow, private-information handling, and prompt generation live in `src/lib/gameSession.js`; UI coordination is in `src/composables/useBoard.js`.
+Wolf-Notes is a Vue 3 + Vite 狼人杀记录台, built with Pinia and Element Plus. It is local-first: state is persisted to `localStorage` under the `lrsNotesGameSession` key, and the app generates AI strategy prompts for the user to copy elsewhere rather than calling an AI API. The entry point is `src/main.js`, which mounts `src/App.vue`; `App.vue` switches between the home, setup, werewolf board, and undercover views with `v-if` — no router is mounted. Session state, migrations, round flow, private-information handling, and prompt generation live in `src/lib/gameSession.js`; UI coordination is in `src/composables/useBoard.js`.
 
 ## Layout
 
-- `src/views/`: home, setup, main board, and legacy views.
+- `src/lib/gameSession.js`: session schema, migrations, rounds, private information, and prompt building.
+- `src/views/`: `home.vue`, `setup.vue`, `main.vue` (board), and `spy.vue` (undercover mode).
 - `src/components/`: board, player, settings, and private-information components.
-- `src/stores/`: Pinia game-mode data.
-- `src/data/`: game-mode configuration.
+- `src/composables/`: board, background, and device-detection state wiring.
+- `src/stores/` and `src/data/`: Pinia game-mode store and its JSON configuration.
 - `test/`: Node's built-in test runner tests for migration, setup, rounds, prompts, and role review.
+- `docs/`: optional VitePress documentation tree.
 - `.github/workflows/deploy.yml`: builds and publishes `dist/` to GitHub Pages on pushes to `main`.
+
+Inactive code — do not wire it up unless asked: `src/router/index.js` is unused (`vue-router` is installed but never mounted), and `src/api/leancloud.js` imports `leancloud-storage`, which is not in `package.json`. `src/views/full.vue`, `old.vue`, `login.vue`, `testMain.vue`, and `notFound.vue` are unreferenced legacy views.
 
 ## Commands
 
@@ -35,7 +39,7 @@ Use short, single-purpose commit messages. Inspect the final diff before committ
 
 ## Safety and configuration
 
-Do not commit `.env`, credentials, tokens, keys, local caches, `dist/`, `node_modules/`, screenshots, ZIP review packages, or browser artifacts. Data is intentionally local-first; do not add an AI API or silently change storage keys. Keep the original MIT `LICENSE` and source attribution intact. Do not expose the local monitoring data or introduce unrelated dependencies.
+Do not commit `.env`, credentials, tokens, keys, local caches, `dist/`, `node_modules/`, screenshots, ZIP review packages, or browser artifacts. Data is intentionally local-first; do not add an AI API or silently change storage keys. Keep the original MIT `LICENSE` and source attribution intact. The Pages build injects `VITE_LEANCLOUD_APP_ID`, `VITE_LEANCLOUD_APP_KEY`, and `VITE_LEANCLOUD_SERVER_URL` from repository secrets; never read, print, or hardcode their values. Do not introduce unrelated dependencies.
 
 ## Agent boundaries
 
