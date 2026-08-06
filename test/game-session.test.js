@@ -37,7 +37,7 @@ test('keeps three speech flags independent and never overwrites text', () => {
   const session = createSession()
   session.rounds[0].speeches[4] = {text: '我先听后置位。', flags: {noSpeech: true, lowInformation: true, noLastWords: true}}
   const prompt = buildStrategyPrompt(session)
-  assert.match(prompt, /4号：我先听后置位/) 
+  assert.match(prompt, /4号：我先听后置位/)
   assert.match(prompt, /本轮未发言/) 
   assert.match(prompt, /用户标记为滑水/) 
   assert.match(prompt, /无遗言/) 
@@ -83,4 +83,27 @@ test('does not compact full output unless a limit or compact mode is requested',
   assert.match(limited, /这段私有信息必须保留/) 
   assert.match(limited, /这条公共事件必须保留/) 
   assert.match(limited, /当前轮完整发言必须保留/) 
+})
+
+test('玩家状态标注到发言行', () => {
+  const session = createSession()
+  session.rounds[0].speeches[3] = {text: '我觉得1号是狼。', flags: {}}
+  session.players[3].lifeStatus = 'eliminated'
+  session.players[3].electionStatus = 'candidate'
+  session.players[5] = {lifeStatus: 'alive', electionStatus: 'none'}
+  session.rounds[0].speeches[5] = {text: '跟着预言家走。', flags: {}}
+  const prompt = buildStrategyPrompt(session)
+  assert.match(prompt, /3号（已出局）：我觉得1号是狼/)
+  assert.match(prompt, /5号：跟着预言家走/)
+})
+
+test('玩家状态总览段落存在', () => {
+  const session = createSession()
+  session.players[1] = {lifeStatus: 'eliminated', electionStatus: 'none'}
+  session.players[4] = {lifeStatus: 'alive', electionStatus: 'candidate'}
+  const prompt = buildStrategyPrompt(session)
+  assert.match(prompt, /【玩家状态总览】/)
+  assert.match(prompt, /1号：出局/)
+  assert.match(prompt, /4号：存活，首日警上/)
+  assert.match(prompt, /2号：存活，首日警下/)
 })

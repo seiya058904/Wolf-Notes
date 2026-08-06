@@ -79,6 +79,28 @@ export function createRound(meta = {}) {
 }
 const pad = seat => `${seat}号`
 
+// 选举状态标签（仅用于状态总览，不在发言行显示）——"首日"前缀强调这是历史标签而非当前状态
+const electionLabel = (players, seat) => {
+  const p = players?.[seat]
+  if (!p) return ''
+  return {none: '首日警下', candidate: '首日警上', withdrawn: '退水'}[p.electionStatus] || ''
+}
+
+// 12 席状态总览：存活/出局 + 首日竞选历史标签
+// 说明文案强调竞选状态仅反映第一天选择，不代表当前轮次仍在进行竞选
+const buildPlayersSummary = (players) => {
+  if (!players) return ''
+  const lines = Array.from({length: 12}, (_, i) => i + 1)
+    .map(seat => {
+      const p = players[seat]
+      if (!p) return `${seat}号：未知`
+      const life = p.lifeStatus === 'eliminated' ? '出局' : '存活'
+      const elect = electionLabel(players, seat)
+      return elect ? `${seat}号：${life}，${elect}` : `${seat}号：${life}`
+    })
+  return `【玩家状态总览】\n以下为各玩家在整个对局中的最终状态。首日警上/警下/退水仅反映第一天的警长竞选选择，是历史标签而非当前轮次状态；出局表示该玩家已在某一轮被淘汰，请结合各轮的死亡/放逐记录判断具体出局时机。\n${lines.join('\n')}\n\n`
+}
+
 // 身份→阵营映射表：覆盖 src/data/game-mode-configs.json 全部 52 个版型简称与常用全称。
 // 未知身份（如千面、自定义身份）不在此表，返回空串，由用户手动选择阵营。
 export const CAMP_MAP = {
@@ -368,10 +390,12 @@ export function buildStrategyPrompt(session, options = {}) {
   const rounds = (session.rounds || []).filter(item => scope !== 'current' || item.id === session.currentRoundId)
   const currentId = session.currentRoundId || rounds.at(-1)?.id
   const current = rounds.find(item => item.id === currentId)
-  const speechBlock = (item, compact = false) => {
+  const speechBlock = (item, players, compact = false) => {
     const lines = Object.entries(item?.speeches || {}).filter(([, speechItem]) => speechItem.text?.trim() || flagText(speechItem)).map(([seat, speechItem]) => {
       const text = compact ? trimEarlier(speechItem.text || '') : speechItem.text || ''
-      return `${pad(Number(seat))}：${text}${text && flagText(speechItem) ? ' ' : ''}${flagText(speechItem)}`
+      // 发言行只标注"已出局"（用于已淘汰玩家），不标注"存活"（默认状态）和选举状态（历史标签，非当前轮次状态）
+      const eliminated = players?.[Number(seat)]?.lifeStatus === 'eliminated' ? '（已出局）' : ''
+      return `${pad(Number(seat))}${eliminated}：${text}${text && flagText(speechItem) ? ' ' : ''}${flagText(speechItem)}`
     })
     return lines.length ? `${lines.join('\n')}\n` : ''
   }
@@ -385,7 +409,7 @@ export function buildStrategyPrompt(session, options = {}) {
   // 待复核（privateNotesNeedsReview）的非公开信息不放入此段，由主流程单独收集输出
   const recordBlock = (round, compact = false) => {
     const parts = []
-    const speeches = speechBlock(round, compact)
+    const speeches = speechBlock(round, session.players, compact)
     if (speeches.trim()) parts.push(`【玩家发言】\n${speeches}`)
     if (round.publicEvents?.trim()) parts.push(`【公共信息】\n${round.publicEvents.trim()}\n`)
     if (round.privateNotes?.trim() && !round.privateNotesNeedsReview) parts.push(`【用户掌握的非公开信息】\n以下信息只有用户或用户阵营掌握，其他玩家未必知道。AI 在制定策略时可以使用，但不能假设其他玩家也知道，也不得建议用户无理由公开自己的隐藏身份或秘密信息。\n${round.privateNotes.trim()}\n`)
@@ -414,7 +438,9 @@ export function buildStrategyPrompt(session, options = {}) {
   const goal = session.game?.myCamp === '狼人' ? '提高狼队胜率；重点分析狼队暴露风险、票型解释、下一轮发言与夜间目标。' : session.game?.myCamp === '第三方' ? '围绕该身份的胜利条件给出生存、发言和投票策略；规则不明时明确不确定性。' : '重点找出狼人，给出可信玩家、关键问题、投票建议和适合当前身份的短发言稿。'
   const task = `【任务】\n${goal}\n不要把玩家自称当作事实；不要盲从用户评价；不要编造未记录的发言或事件；不得假设其他玩家知道用户掌握的非公开信息（如狼队刀口、查验结果、用药等），也不得建议用户无理由公开自己的隐藏身份或秘密信息。请依次给出：局势摘要、关键公共事实、身份倾向及理由、两到三种可能世界、主要风险、下一步行动、投票或技能建议、发言重点、简短发言稿、备用方案、缺失信息。`
 
-  const required = `${header}${gameRecords}${reviewableSection}${notesText}`
+  const playersSummary = buildPlayersSummary(session.players)
+
+  const required = `${header}${playersSummary}${gameRecords}${reviewableSection}${notesText}`
   // compactEarlierRounds：非当前轮发言截短；maxCharacters：超限时保留结构、压缩早期轮次内容
   // 注意：待复核段（reviewableSection）保持完整不压缩，因其为关键待确认信息
   let body = required
@@ -423,14 +449,14 @@ export function buildStrategyPrompt(session, options = {}) {
       const bodyText = item.id === currentId ? recordBlock(item, false) : recordBlock(item, true)
       return bodyText.trim() ? `【${item.label}】\n${bodyText}` : ''
     }).filter(Boolean).join('\n')
-    body = `${header}${compacted ? `【对局记录】\n${compacted}\n` : ''}${reviewableSection}${notesText}`
+    body = `${header}${playersSummary}${compacted ? `【对局记录】\n${compacted}\n` : ''}${reviewableSection}${notesText}`
   } else if (maxCharacters && body.length + task.length > maxCharacters && current) {
     // 压缩早期轮次（当前轮保持完整），并在记录末尾标注
     const compacted = rounds.map(item => {
       const bodyText = item.id === currentId ? recordBlock(item, false) : recordBlock(item, true)
       return bodyText.trim() ? `【${item.label}】\n${bodyText}` : ''
     }).filter(Boolean).join('\n')
-    body = `${header}${compacted ? `【对局记录】\n${compacted}\n【较早发言已压缩】\n` : ''}${reviewableSection}${notesText}`
+    body = `${header}${playersSummary}${compacted ? `【对局记录】\n${compacted}\n【较早发言已压缩】\n` : ''}${reviewableSection}${notesText}`
   }
 
   const prompt = `${body}${task}`
