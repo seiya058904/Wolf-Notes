@@ -74,7 +74,9 @@ for (const kind of ['app', 'docs']) {
       }
       for (const suffix of ['?raw', '::$DATA?raw', '::$DATA?import&raw??']) {
         const url = `${base}${server.config.base}@fs/${protectedCanary.replaceAll('\\', '/')}${suffix}`
-        const response = await fetch(url, {signal: AbortSignal.timeout(10000)})
+        // Unix has no NTFS alias: request a file response so a missing alias
+        // yields 404 instead of the dev server's HTML SPA fallback (200).
+        const response = await fetch(url, {headers: {Accept: 'application/octet-stream'}, signal: AbortSignal.timeout(10000)})
         report.push({protected: true, suffix, status: response.status, leaked: (await response.text()).includes(marker)})
       }
       t.diagnostic(JSON.stringify(report))
