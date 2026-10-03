@@ -61,17 +61,18 @@ test('新对局确认前不覆盖旧数据', () => {
     const old = createSession()
     old.rounds[0].publicEvents = '旧对局的公共事件。'
     saveSession(storage, old)
+    const oldSaved = storage.getItem(SESSION_KEY)
     // 用户在开局设置填了一部分（未确认），不写入 storage
     const draft = createSession()
     draft.game.modeId = 5
     draft.game.mySeat = 2
-    assert.equal(storage.getItem(SESSION_KEY), JSON.stringify(old))
+    assert.equal(storage.getItem(SESSION_KEY), oldSaved)
     // 最终确认后才替换
     const confirmed = createSession()
     confirmed.game = {modeId: 5, mySeat: 2, myRole: '预言家', myCamp: '好人', privateInfo: '', privateNotes: '', private: defaultPrivate('seer')}
     confirmed.game.private.checks = [{round: '第一夜', target: 3, result: '好人'}]
     syncPrivateInfo(confirmed.game)
-    saveSession(storage, confirmed)
+    saveSession(storage, confirmed, {replace: true})
     const now = loadSession(storage)
     assert.equal(now.game.modeId, 5)
     assert.equal(now.rounds[0].publicEvents, '')
@@ -173,7 +174,9 @@ test('刷新后的会话数据可以恢复', () => {
     session.currentRoundId = 'r3'
     saveSession(storage, session)
     const roundTrip = loadSession(storage)
-    assert.deepEqual(roundTrip, session)
+    const {storageRevision, ...restoredData} = roundTrip
+    assert.equal(storageRevision, 1)
+    assert.deepEqual(restoredData, session)
     assert.equal(roundTrip.currentRoundId, 'r3')
     assert.match(roundTrip.game.privateInfo, /第二夜守护2号/)
 })

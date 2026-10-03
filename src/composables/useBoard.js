@@ -1,8 +1,8 @@
-import {computed, onMounted, ref, watch} from 'vue'
+import {computed, nextTick, onMounted, ref, watch} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {useGameModeStore} from '@/stores/gameModeStore'
 import {storeToRefs} from 'pinia'
-import {buildStrategyPrompt, clearRoundPrivateNotes, confirmRoundPrivateNotes, createRound, createSession, inferCamp, insertSpeechTemplate, isSessionReady, loadSession, makeVoteText, markRoundPrivateNotesForReview, nextRoundMeta, privateNoteRoundCount, privateTypeForRole, resetPrivateForRole, resolveNextRound, saveSession, syncPrivateInfo} from '@/lib/gameSession'
+import {buildStrategyPrompt, clearRoundPrivateNotes, confirmRoundPrivateNotes, createRound, createSession, inferCamp, insertSpeechTemplate, isSessionReady, loadSession, makeVoteText, markRoundPrivateNotesForReview, nextRoundMeta, privateNoteRoundCount, privateTypeForRole, resetPrivateForRole, resolveNextRound, saveSessionSafely, syncPrivateInfo} from '@/lib/gameSession'
 
 const pad = seat => String(seat).padStart(2, '0')
 const speech = () => ({text: '', flags: {noSpeech: false, lowInformation: false, noLastWords: false}})
@@ -20,15 +20,16 @@ export function useBoard() {
   const currentRound = computed(() => session.value.rounds.find(item => item.id === session.value.currentRoundId) || session.value.rounds[0])
   const prompt = computed(() => buildStrategyPrompt(session.value, {...promptOptions.value, gameMode: selectedMode.value}))
   const modeDesc = computed(() => selectedMode.value?.roles?.map(role => `${role.count > 1 ? role.count : ''}${role.text}`).join('·') || '')
-  const persist = () => { if (!saveSession(window.localStorage, session.value)) ElMessage.warning('本地保存失败，内容仍保留在当前页面') }
+  const persist = async () => { if (!await saveSessionSafely(window.localStorage, session.value)) ElMessage.warning('另一页面已更新此对局，或本地存储不可用。本页改动未保存，请先复制未保存内容，再刷新。') }
   const applyTheme = theme => document.documentElement.dataset.theme = theme === 'system' ? '' : theme
 
-  onMounted(() => {
+  onMounted(async () => {
     session.value = loadSession(window.localStorage)
     // 不静默补齐任何开局信息；缺失时置 gateBlocked，由上层引导回开局设置
     gateBlocked.value = !isSessionReady(session.value.game)
-    hydrated.value = true
     applyTheme(session.value.uiPreferences?.theme || 'system')
+    await nextTick()
+    hydrated.value = true
   })
   watch(session, () => { if (hydrated.value) persist() }, {deep: true})
   watch(selectedMode, mode => { if (mode) session.value.game.modeId = mode.id })

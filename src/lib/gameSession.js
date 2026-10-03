@@ -1,5 +1,17 @@
 export const SESSION_KEY = 'lrsNotesGameSession'
 
+// Non-enumerable snapshot ownership also survives Vue's reactive proxy. It is
+// never exported into the schema; old v2/v3 saves keep their existing fields.
+const persistenceBase = Symbol('persistenceBase')
+const rememberSaved = (session, raw, revision = 0) => {
+  Object.defineProperty(session, persistenceBase, {value: {raw, revision}, configurable: true})
+  return session
+}
+const savedRevision = raw => {
+  const revision = raw ? JSON.parse(raw)?.storageRevision : 0
+  return Number.isSafeInteger(revision) && revision >= 0 ? revision : 0
+}
+
 const seats = () => Object.fromEntries(Array.from({length: 12}, (_, index) => [index + 1, {lifeStatus: 'alive', electionStatus: 'none'}]))
 const flags = () => ({noSpeech: false, lowInformation: false, noLastWords: false})
 const speech = () => ({text: '', flags: flags()})
@@ -359,14 +371,39 @@ export function loadSession(storage) {
     const saved = storage?.getItem(SESSION_KEY)
     if (saved) {
       const parsed = JSON.parse(saved)
-      if (parsed?.schemaVersion === 3 && Array.isArray(parsed.rounds)) return normalizeSession(parsed)
-      if (parsed?.schemaVersion === 2) return migrateV2Session(parsed)
+      if (parsed?.schemaVersion === 3 && Array.isArray(parsed.rounds)) return rememberSaved(normalizeSession(parsed), saved, savedRevision(saved))
+      if (parsed?.schemaVersion === 2) return rememberSaved(migrateV2Session(parsed), saved, savedRevision(saved))
     }
-    return migrateLegacySession({remarks: storage?.getItem('remarks') || '', chatRecords: JSON.parse(storage?.getItem('chatRecords') || '{}')})
+    return rememberSaved(migrateLegacySession({remarks: storage?.getItem('remarks') || '', chatRecords: JSON.parse(storage?.getItem('chatRecords') || '{}')}), saved || null)
   } catch { return createSession() }
 }
 
-export function saveSession(storage, session) { try { storage?.setItem(SESSION_KEY, JSON.stringify(session)); return true } catch { return false } }
+export function saveSession(storage, session, {replace = false} = {}) {
+  try {
+    if (!storage?.getItem || !storage?.setItem) return false
+    const current = storage.getItem(SESSION_KEY)
+    const base = session[persistenceBase]
+    // Compare the full saved snapshot as well as its revision: this protects
+    // legacy revision-0 data and a different/new session from stale writers.
+    if (!replace && current !== (base?.raw ?? null)) return false
+    // Opening the board or a reactive no-op must not invalidate another tab.
+    if (base && JSON.stringify({...session, storageRevision: base.revision}) === current) return true
+    const revision = (replace ? savedRevision(current) : base?.revision || 0) + 1
+    if (!Number.isSafeInteger(revision)) return false
+    const raw = JSON.stringify({...session, storageRevision: revision})
+    storage.setItem(SESSION_KEY, raw)
+    rememberSaved(session, raw, revision)
+    return true
+  } catch { return false }
+}
+
+export async function saveSessionSafely(storage, session, options, locks = globalThis.navigator?.locks) {
+  try {
+    // Serialize the read/compare/write across tabs when Web Locks is available.
+    if (locks?.request) return await locks.request(SESSION_KEY, () => saveSession(storage, session, options))
+    return saveSession(storage, session, options)
+  } catch { return false }
+}
 
 export function insertSpeechTemplate(text, type, target) {
   const targetText = target ? pad(target) : '某号'

@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "docs:dev": "vitepress dev docs --host 0.0.0.0 --port 3000",
     "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs --host 0.0.0.0 --port 3000"
+    "docs:preview": "vitepress preview docs --host 0.0.0.0 --port 3000",
+    "test:browser": "node scripts/verify-session-conflict.mjs"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",

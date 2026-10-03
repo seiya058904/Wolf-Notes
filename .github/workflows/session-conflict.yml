@@ -1,0 +1,27 @@
+name: Session conflict regression
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  session-conflict:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Install isolated browser test toolchain
+        run: |
+          npm install --prefix "$RUNNER_TEMP/wolf-browser" --no-save --no-package-lock playwright@1.55.0
+          "$RUNNER_TEMP/wolf-browser/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Real two-page persistence regression
+        env:
+          QA_PLAYWRIGHT_PACKAGE: ${{ runner.temp }}/wolf-browser/node_modules/playwright
+        run: npm run test:browser

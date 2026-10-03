@@ -15,7 +15,7 @@ import Home from '@/views/home.vue'
 import Setup from '@/views/setup.vue'
 import Main from '@/views/main.vue'
 import Spy from '@/views/spy.vue'
-import {isSessionReady, loadSession, resolveInitialView, saveSession} from '@/lib/gameSession'
+import {isSessionReady, loadSession, resolveInitialView, saveSessionSafely} from '@/lib/gameSession'
 
 const store = useGameModeStore()
 // 页面与数据分离：当前视图不持久化，初始化恒为首页。
@@ -49,8 +49,11 @@ const handleNew = () => {
 const handleCancelSetup = () => { currentView.value = 'home' }
 
 // 开局设置最终确认后才创建/更新会话并进入记录台
-const handleSetupConfirm = (session) => {
-  saveSession(window.localStorage, session)
+const handleSetupConfirm = async (session) => {
+  if (!await saveSessionSafely(window.localStorage, session, {replace: !setupDraft.value})) {
+    ElMessage.warning('另一页面已更新此对局，或本地存储不可用。开局设置未保存，请先复制未保存内容，再刷新。')
+    return
+  }
   currentView.value = 'werewolf'
 }
 
