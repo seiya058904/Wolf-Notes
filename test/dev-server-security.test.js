@@ -18,7 +18,7 @@ test('application and documentation defaults stay on loopback; LAN is explicit',
 })
 
 for (const kind of ['app', 'docs']) {
-  test(`${kind} dev server denies only synthetic out-of-root canary requests`, async t => {
+  test(`${kind} dev server denies synthetic out-of-root and protected canary requests`, async t => {
     // Keep the fixture on the server's volume: Windows raw-FS middleware
     // resolves against that volume. A cross-volume 404 would prove nothing.
     const fixture = await mkdtemp(path.join(path.dirname(path.resolve(root)), 'wolf-security-'))
@@ -28,6 +28,7 @@ for (const kind of ['app', 'docs']) {
     let server
     let dependencyLink
     let control
+    let protectedCanary
     const report = []
     try {
       if (kind === 'app') {
@@ -45,16 +46,36 @@ for (const kind of ['app', 'docs']) {
       const address = server.httpServer.address()
       assert.equal(address.address, '127.0.0.1')
       const base = `http://127.0.0.1:${address.port}`
-      assert.equal((await fetch(base + server.config.base, {signal: AbortSignal.timeout(10000)})).status, 200)
+      const entry = await fetch(base + server.config.base, {signal: AbortSignal.timeout(10000)})
+      assert.equal(entry.status, 200)
+      // Load the entry modules as a browser does. This also lets Vite's cold
+      // dependency crawl settle before closing a freshly started server.
+      for (const [, src] of (await entry.text()).matchAll(/<script[^>]+src="([^"]+)"/g)) {
+        assert.equal((await fetch(new URL(src, base), {signal: AbortSignal.timeout(10000)})).status, 200)
+      }
+      await server.waitForRequestsIdle()
       control = path.join(server.config.root, `wolf-control-${randomUUID()}.txt`)
       await writeFile(control, 'PUBLIC_CONTROL_CANARY', {flag: 'wx'})
       const positive = await fetch(`${base}${server.config.base}@fs/${control.replaceAll('\\', '/')}`, {signal: AbortSignal.timeout(10000)})
       assert.equal(positive.status, 200)
       assert.equal(await positive.text(), 'PUBLIC_CONTROL_CANARY')
+      // A denied extension INSIDE fs.allow exercises the separate fs.deny
+      // boundary, including Windows NTFS alternate data streams (CVE-2026-53571).
+      protectedCanary = path.join(server.config.root, `wolf-protected-${randomUUID()}.pem`)
+      await writeFile(protectedCanary, marker, {flag: 'wx'})
+      if (process.platform === 'win32') {
+        assert.equal(await readFile(`${protectedCanary}::$DATA`, 'utf8'), marker,
+          'the Windows canary must actually support the alternate path')
+      }
       for (const suffix of ['', '?raw', '?raw??', '?import&raw??', '?raw?import', '?raw&import']) {
         const url = `${base}${server.config.base}@fs/${canary.replaceAll('\\', '/')}${suffix}`
         const response = await fetch(url, {signal: AbortSignal.timeout(10000)})
         report.push({suffix, status: response.status, leaked: (await response.text()).includes(marker)})
+      }
+      for (const suffix of ['?raw', '::$DATA?raw', '::$DATA?import&raw??']) {
+        const url = `${base}${server.config.base}@fs/${protectedCanary.replaceAll('\\', '/')}${suffix}`
+        const response = await fetch(url, {signal: AbortSignal.timeout(10000)})
+        report.push({protected: true, suffix, status: response.status, leaked: (await response.text()).includes(marker)})
       }
       t.diagnostic(JSON.stringify(report))
       assert.ok(report.every(row => row.status >= 400 && !row.leaked), JSON.stringify(report))
@@ -62,6 +83,7 @@ for (const kind of ['app', 'docs']) {
       await server?.close()
       await unlink(canary)
       if (control) await unlink(control)
+      if (protectedCanary) await unlink(protectedCanary)
       if (dependencyLink) await unlink(dependencyLink)
     }
   })

@@ -7,19 +7,17 @@ import {
   NolebaseEnhancedReadabilitiesMenu,
   NolebaseEnhancedReadabilitiesPlugin,
   NolebaseEnhancedReadabilitiesScreenMenu,
+  type Options as ReadabilitiesOptions,
 } from '@nolebase/vitepress-plugin-enhanced-readabilities/client'
 import {
   InjectionKey,
   NolebaseGitChangelogPlugin,
-  Options,
 } from '@nolebase/vitepress-plugin-git-changelog/client'
 import { NolebaseHighlightTargetedHeading } from '@nolebase/vitepress-plugin-highlight-targeted-heading/client'
 import { NolebaseInlineLinkPreviewPlugin } from '@nolebase/vitepress-plugin-inline-link-preview/client'
 import { NolebasePagePropertiesPlugin } from '@nolebase/vitepress-plugin-page-properties'
 import TwoslashFloatingVue from '@shikijs/vitepress-twoslash/client'
-import { Footer } from '@theojs/lumen' //不好看
 import codeblocksFold from 'vitepress-plugin-codeblocks-fold'
-import { Footer_Data } from '../data/footerData.ts'
 
 import '@nolebase/vitepress-plugin-enhanced-mark/client/style.css'
 import '@nolebase/vitepress-plugin-enhanced-readabilities/client/style.css'
@@ -41,7 +39,7 @@ export default {
     return h(DefaultTheme.Layout, null, {
       // 'aside-outline-before': () => h(ShareButton),
       'home-hero-before': () => h(Hero),
-      'layout-bottom': () => h(Footer, { Footer_Data }),
+      // DefaultTheme renders the existing MIT/author footer from config.js.
       'nav-bar-content-after': () => h(NolebaseEnhancedReadabilitiesMenu),
       'nav-screen-content-after': () => h(NolebaseEnhancedReadabilitiesScreenMenu),
       'layout-top': () => [h(NolebaseHighlightTargetedHeading)],
@@ -54,7 +52,7 @@ export default {
         disableHelp: true,
         defaultToggle: true,
       },
-    } as Options)
+    } as ReadabilitiesOptions)
     app.use(TwoslashFloatingVue)
     app.component('NCard', NCard)
     app.use(NolebaseGitChangelogPlugin)

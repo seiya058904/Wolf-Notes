@@ -1,9 +1,5 @@
-@import '../font/HarmonyOS_Sans_SC_Medium/font.css';
-@import '../font/HarmonyOS_Sans_SC_Regular/font.css';
-@import '../font/HarmonyOS_Sans_SC_Black/font.css';
-@import '../font/HarmonyOS_Sans_SC_Bold/font.css';
-@import '../font/HarmonyOS_Sans_SC_Thin/font.css';
-@import '../font/HarmonyOS_Sans_SC_Light/font.css';
+/* Use an installed HarmonyOS font when available, otherwise the existing
+   system fallback. No font files are distributed by this repository. */
 
 /* 覆盖全局字体 */
 :root {
