@@ -1,4 +1,6 @@
 import {defineConfig} from 'vitepress'
+import {GitChangelog} from '@nolebase/vitepress-plugin-git-changelog/vite'
+import {PageProperties} from '@nolebase/vitepress-plugin-page-properties/vite'
 
 import gitee from '../public/gitee.js';
 
@@ -8,6 +10,28 @@ export default defineConfig({
     title: "狼人杀在线笔记",
     description: "为狼人杀游戏玩家设计的在线笔记工具",
     cleanUrls: true,
+    vite: {
+        optimizeDeps: {
+            // These Vue/virtual-module plugins need Vite's transform pipeline.
+            exclude: [
+                '@nolebase/vitepress-plugin-enhanced-readabilities',
+                '@nolebase/vitepress-plugin-git-changelog',
+                '@nolebase/vitepress-plugin-highlight-targeted-heading',
+                '@nolebase/vitepress-plugin-inline-link-preview',
+                '@nolebase/vitepress-plugin-page-properties',
+            ],
+            include: [
+                '@shikijs/vitepress-twoslash/client',
+                'vitepress-plugin-codeblocks-fold',
+                'canvas-confetti',
+            ],
+        },
+        ssr: {noExternal: [/^@nolebase\//]},
+        plugins: [
+            GitChangelog({repoURL: 'https://github.com/seiya058904/Wolf-Notes'}),
+            PageProperties(),
+        ],
+    },
     themeConfig: {
         logo: {
             light: '/logo.svg',

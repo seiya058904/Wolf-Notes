@@ -34,6 +34,41 @@ Online demo: [GitHub Pages](https://seiya058904.github.io/Wolf-Notes/)
 - 狼人杀与“谁是卧底”记录模式
 - 笔记导出与整局重置
 
+## Local development / 本地开发
+
+Use Node.js 22.12+ and install the lockfile with `npm ci`.
+`npm run dev` listens only on `127.0.0.1:8080`; `npm run docs:dev` and
+`npm run docs:preview` listen only on `127.0.0.1:3000`.
+For an explicitly trusted LAN debugging session, use `npm run dev:lan` or
+`npm run docs:dev:lan`. Stop the development server when finished.
+
+开发和文档预览默认只允许本机访问。确需可信局域网调试时，显式使用带 `:lan`
+后缀的命令；使用完毕后关闭开发服务。生产静态站点的地址和存档格式保持不变。
+
+VitePress stays on stable `1.6.4`, with an explicit npm override to the
+security-supported Vite `6.4.3`; Vue plugin `5.2.4` supports Vite 6. This override
+is beyond VitePress 1.x's declared Vite 5 range and is covered by full builds and
+real dev/preview browser checks. Do not remove it and reinstall vulnerable Vite 5.
+The existing Twoslash integration uses `3.23.0` with FloatingVue `5.2.2` because
+later FloatingVue versions changed the component internals its client uses.
+
+The documentation theme's dependencies are declared explicitly. Its Git and page
+property plugins generate data from the repository and Markdown; the footer uses
+the existing MIT/author configuration. Unbundled HarmonyOS fonts fall back to
+installed/system fonts. No replacement page content or author data is fabricated.
+`docs:preview` uses Vite's static preview: VitePress 1.x ignores its `--host` flag.
+CI requires application and documentation builds, browser checks, and Linux and
+Windows canary regressions.
+
+Run `npm test`, `npm run build:all`, `npm run test:browser`, and `npm run test:docs`
+for validation. Browser scripts require Playwright with Chromium, supplied by
+`QA_PLAYWRIGHT_PACKAGE` (CI installs an isolated copy).
+Security tests use nonsensitive temporary canaries outside the served root and a
+denied-extension canary inside it, including Windows NTFS alternate data streams.
+They never request real user files. Documentation browser checks cover all four
+authored pages, navigation, anchors, attribution, theme controls and local assets
+on desktop/mobile in both dev and preview modes.
+
 ## Source and Acknowledgements
 
 This project is a secondary development of [syhy0612/lrsNotes](https://github.com/syhy0612/lrsNotes), extending it with multi-round speech records, day/night flow, public and private information management, and AI strategy prompt generation.
