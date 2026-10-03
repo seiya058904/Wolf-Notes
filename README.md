@@ -34,6 +34,26 @@ Online demo: [GitHub Pages](https://seiya058904.github.io/Wolf-Notes/)
 - 狼人杀与“谁是卧底”记录模式
 - 笔记导出与整局重置
 
+## Local development / 本地开发
+
+Use Node.js 20.19+ or 22.12+ and install the lockfile with `npm ci`.
+`npm run dev` listens only on `127.0.0.1:8080`; `npm run docs:dev` and
+`npm run docs:preview` listen only on `127.0.0.1:3000`.
+For an explicitly trusted LAN debugging session, use `npm run dev:lan` or
+`npm run docs:dev:lan`. Stop the development server when finished.
+
+开发和文档预览默认只允许本机访问。确需可信局域网调试时，显式使用带 `:lan`
+后缀的命令；使用完毕后关闭开发服务。生产静态站点的地址和存档格式保持不变。
+
+VitePress is pinned to `2.0.0-alpha.20`: the maintained upstream prerelease
+supports Vite 8, while the latest 1.x stable still depends on unsupported Vite 5.
+CI checks application and documentation builds and the canary security regression.
+This is a documentation toolchain prerelease, not a product release.
+
+Run `npm test`, `npm run build:all`, and `npm run test:browser` for validation.
+The security test creates only a nonsensitive temporary canary outside the served
+root and exercises the app and docs dev servers; it never requests real user files.
+
 ## Source and Acknowledgements
 
 This project is a secondary development of [syhy0612/lrsNotes](https://github.com/syhy0612/lrsNotes), extending it with multi-round speech records, day/night flow, public and private information management, and AI strategy prompt generation.
