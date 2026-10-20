@@ -25,6 +25,12 @@
   <sub>ROUND-BY-ROUND NOTES &nbsp;·&nbsp; PUBLIC &amp; PRIVATE CLUES &nbsp;·&nbsp; LOCAL SAVES &nbsp;·&nbsp; COPY-READY AI PROMPTS</sub>
 </p>
 
+<p align="center">
+  <img src="public/bg.webp" width="820" alt="Atmospheric background artwork bundled with Wolf-Notes" />
+  <br />
+  <sub>One of the visual backdrops bundled with the app, not a screenshot of a live match.</sub>
+</p>
+
 ---
 
 > **The hardest part of deduction is remembering what everyone actually said.**
@@ -162,7 +168,7 @@ The app switches between views without an active Vue Router. Keep local save com
 <a id="upstream-and-license"></a>
 ## 📜 Upstream & License
 
-Wolf-Notes is an **unofficial derivative** of [syhy0612/lrsNotes](https://github.com/syhy0612/lrsNotes), originally created by **双叶 / Double Leaves**. This project extends its note-taking workflow with round-based records, clearer information organization, and copy-ready AI strategy prompts. It is not an official upstream release.
+Wolf-Notes is an **unofficial derivative** of [syhy0612/lrsNotes](https://github.com/syhy0612/lrsNotes), originally created by **Double Leaves**. This project extends its note-taking workflow with round-based records, clearer information organization, and copy-ready AI strategy prompts. It is not an official upstream release.
 
 The original copyright notice and the **[MIT License](LICENSE)** are preserved. Retain the upstream attribution when reusing or distributing the software.
 
