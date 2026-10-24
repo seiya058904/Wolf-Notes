@@ -44,3 +44,7 @@ Do not commit `.env`, credentials, tokens, keys, local caches, `dist/`, `node_mo
 ## Agent boundaries
 
 Make the smallest change that satisfies the request. Preserve unrelated user changes. Do not use force push, rebase, reset, or bulk cleanup. Before handoff, verify the intended files, `git diff --check`, relevant tests/build, branch/upstream synchronization, and worktree status.
+
+## 已知问题处理决定
+
+- 2026-10-24 审计 A03：已知确认“清空整局”后新会话无法继续保存、刷新恢复旧局；用户决定不再维护本项目，此问题不修，未经用户重新授权不要启动修复。
