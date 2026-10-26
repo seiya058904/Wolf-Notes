@@ -1,6 +1,12 @@
 <h1 align="center">🐺 Wolf-Notes</h1>
 
 <p align="center">
+  <img src="public/readme-cover.svg" width="100%" alt="Conceptual Wolf-Notes cover showing deduction cards, connected evidence and a night-to-day record" />
+  <br>
+  <sub>ORIGINAL DEDUCTION ILLUSTRATION · NOT AN APP INTERFACE CAPTURE</sub>
+</p>
+
+<p align="center">
   <strong>Every word leaves a trace. Keep the whole game in view.</strong>
 </p>
 
