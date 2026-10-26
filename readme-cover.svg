@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="470" viewBox="0 0 1500 470" role="img" aria-labelledby="t d">
+<title id="t">Wolf-Notes — deduction deserves a record</title>
+<desc id="d">Original midnight-blue vector cover depicting a moon, an evidence notebook, connected statements, and round-by-round deduction cards. This is conceptual artwork, not a game screenshot.</desc>
+<defs>
+<linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0D1422"/><stop offset=".58" stop-color="#192138"/><stop offset="1" stop-color="#29314A"/></linearGradient>
+<linearGradient id="moon"><stop stop-color="#F4E6CA"/><stop offset="1" stop-color="#91B7CD"/></linearGradient>
+<linearGradient id="line"><stop stop-color="#94BFD3"/><stop offset="1" stop-color="#B7A7D6"/></linearGradient>
+<pattern id="stars" width="87" height="73" patternUnits="userSpaceOnUse"><circle cx="8" cy="11" r="1.6" fill="#D4E4F4" opacity=".4"/><circle cx="53" cy="41" r="1" fill="#D4E4F4" opacity=".3"/></pattern>
+</defs>
+<rect width="1500" height="470" fill="url(#bg)"/><rect width="1500" height="470" fill="url(#stars)"/>
+<circle cx="1358" cy="90" r="55" fill="url(#moon)" opacity=".75"/><circle cx="1385" cy="72" r="53" fill="#222E46"/>
+<path d="M0 468H1500" stroke="#95ACC5" stroke-opacity=".27"/>
+<g font-family="Segoe UI,Arial,sans-serif">
+<rect x="84" y="57" width="347" height="41" rx="20" fill="#263349" stroke="#556F88"/>
+<text x="106" y="84" font-size="17" letter-spacing="2.5" font-weight="700" fill="#AFCDDF">LOCAL-FIRST DEDUCTION NOTEBOOK</text>
+<text x="78" y="205" font-size="91" font-weight="850" letter-spacing="-4" fill="#F2F5FA">WOLF</text>
+<text x="79" y="299" font-size="91" font-weight="850" letter-spacing="-4" fill="url(#line)">NOTES</text>
+<text x="86" y="351" font-size="26" fill="#CBD7E6">Every word leaves a trace.</text>
+<path d="M87 380H724" stroke="#85A4C6" stroke-opacity=".45"/>
+<text x="88" y="417" font-size="17" font-weight="700" letter-spacing="2.6" fill="#9BB5D2">RECORD  /  QUESTION  /  RECONSIDER</text>
+</g>
+<!-- An evidence timeline, not an application UI screenshot. -->
+<path d="M890 104L1045 170 1193 125 1346 217M1045 170L1115 326 1346 217M890 104L917 341 1115 326" stroke="#AAB7D5" stroke-width="3" stroke-opacity=".47" fill="none"/>
+<path d="M890 104L1045 170 1193 125 1346 217M1045 170L1115 326 1346 217" stroke="#D7A0AD" stroke-width="2" stroke-dasharray="7 12" fill="none"/>
+<g font-family="Segoe UI,Arial,sans-serif">
+<g><rect x="813" y="62" width="173" height="108" rx="16" fill="#27354C" stroke="#6F8FAB" stroke-width="2"/><rect x="829" y="79" width="74" height="23" rx="11" fill="#405A73"/><text x="843" y="96" font-size="12" letter-spacing="1.4" font-weight="700" fill="#C8DCEF">NIGHT</text><text x="831" y="128" font-size="21" font-weight="700" fill="#F5F2F3">Round 01</text><path d="M832 141H964" stroke="#84A6BD"/></g>
+<g><rect x="981" y="130" width="181" height="112" rx="16" fill="#3B344B" stroke="#A59AB7" stroke-width="2"/><rect x="999" y="146" width="60" height="23" rx="11" fill="#72526B"/><text x="1015" y="162" font-size="12" letter-spacing="1.4" font-weight="700" fill="#F4D8E5">DAY</text><text x="998" y="194" font-size="21" font-weight="700" fill="#F6EFF7">Claim</text><path d="M999 208H1144" stroke="#C8A9C2"/></g>
+<g><rect x="1179" y="72" width="152" height="108" rx="16" fill="#26384B" stroke="#7894AF" stroke-width="2"/><text x="1199" y="108" font-size="15" font-weight="700" letter-spacing="2" fill="#9DD0E8">EVIDENCE</text><path d="M1198 131H1308M1198 143H1291" stroke="#99B5D1" stroke-width="4" stroke-linecap="round"/></g>
+<g><rect x="1259" y="200" width="181" height="106" rx="16" fill="#403547" stroke="#AC8198" stroke-width="2"/><text x="1279" y="236" font-size="16" font-weight="700" letter-spacing="2" fill="#E7BACF">VOTE</text><path d="M1280 259H1413M1280 275H1377" stroke="#C59EAF" stroke-width="4" stroke-linecap="round"/></g>
+<g><rect x="1028" y="303" width="187" height="104" rx="16" fill="#223F4A" stroke="#78AAAB" stroke-width="2"/><text x="1050" y="340" font-size="16" font-weight="700" letter-spacing="2" fill="#A6E5D3">REVIEW</text><path d="M1051 359H1194M1051 376H1160" stroke="#7CB0B1" stroke-width="4" stroke-linecap="round"/></g>
+</g>
+<g fill="#EAC9D5" stroke="#23334A" stroke-width="3"><circle cx="890" cy="104" r="8"/><circle cx="1045" cy="170" r="8"/><circle cx="1193" cy="125" r="8"/><circle cx="1346" cy="217" r="8"/><circle cx="1115" cy="326" r="8"/></g>
+</svg>
