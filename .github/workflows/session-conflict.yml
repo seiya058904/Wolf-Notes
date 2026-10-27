@@ -8,6 +8,7 @@ permissions:
 jobs:
   session-conflict:
     runs-on: ubuntu-24.04
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -28,6 +29,7 @@ jobs:
 
   docs-build:
     runs-on: ubuntu-24.04
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
@@ -49,6 +51,7 @@ jobs:
 
   security-windows:
     runs-on: windows-latest
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
