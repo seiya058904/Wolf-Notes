@@ -126,6 +126,10 @@ Wolf-Notes stores game records in your browser's `localStorage`. For Werewolf, a
 - **Concurrent edits are guarded:** when another tab has updated the same Werewolf session, a stale save is rejected rather than silently overwriting the newer record.
 - **Browser storage is not a permanent backup.** Clearing site data, switching browser profiles, or using private-browsing mode may make your notes unavailable. Copy out anything important before resetting or clearing storage.
 
+### Known limitation: clearing a Werewolf match
+
+The board's **Clear Entire Game** action can leave a new session unable to save while the previous saved match remains in storage. Refreshing then restores that old match. This is a known, deferred issue; active maintenance has stopped. Copy important notes before leaving the page, and use the home screen's **New Game** setup and confirmation to start a replacement match.
+
 <a id="run-locally"></a>
 ## 🚀 Run Locally
 
@@ -158,10 +162,10 @@ Browser checks require an available Playwright/Chromium installation. Documentat
 ### Source map
 
 ```text
-src/lib/gameSession.js       Session schema, round flow, migrations, and prompts
+src/lib/gameSession.js     Session schema, round flow, migrations, and prompts
 src/views/                Home, setup, Werewolf, and Undercover views
 src/components/           Game boards, player controls, and note panels
-src/composables/          View state and UI coordination
+src/composables/           View state and UI coordination
 src/stores/               Game-mode state
 test/                     Regression tests
 docs/                     Optional VitePress documentation
