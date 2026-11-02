@@ -188,3 +188,7 @@ The original copyright notice and the **[MIT License](LICENSE)** are preserved. 
   <sub>KEEP THE ROUNDS. FOLLOW THE CLUES. MAKE YOUR OWN CALL.</sub><br>
   <sub>Wolf-Notes · A clearer record for a complicated table.</sub>
 </p>
+
+## Website analytics
+
+The public website uses Cloudflare Web Analytics for aggregate page visits and performance. The beacon loads only on `seiya058904.github.io`; local previews and offline copies do not load it. No game saves, journal entries, map contents, or form values are passed to the analytics integration. Statistics start after deployment and do not recover earlier traffic. See [Cloudflare's privacy policy](https://www.cloudflare.com/privacypolicy/).
